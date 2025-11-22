@@ -41,7 +41,8 @@ def connect_github_repository(request):
         try:
             g = Github(access_token)
             user = g.get_user()
-            for repo in user.get_repos():
+            # Limit to first 100 repos for performance
+            for repo in user.get_repos().get_page(0)[:100]:
                 github_repos.append({
                     'id': repo.id,
                     'name': repo.name,
@@ -53,7 +54,7 @@ def connect_github_repository(request):
                 })
         except Exception as e:
             logger.error(f"Failed to fetch GitHub repositories: {e}")
-            messages.error(request, f"Failed to fetch GitHub repositories: {e}")
+            messages.error(request, "Failed to fetch GitHub repositories. Please try again later.")
     
     # Connect selected repository
     if request.method == 'POST':
@@ -85,7 +86,7 @@ def connect_github_repository(request):
             
         except Exception as e:
             logger.error(f"Failed to connect repository: {e}")
-            messages.error(request, f"Failed to connect repository: {e}")
+            messages.error(request, "Failed to connect repository. Please try again.")
     
     return render(request, 'projects/connect_github.html', {
         'github_repos': github_repos
