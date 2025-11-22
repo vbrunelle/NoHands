@@ -334,9 +334,9 @@ class ConnectGitHubRepositoryViewTest(TestCase):
         mock_repo.default_branch = 'main'
         mock_repo.private = False
         
-        # Mock paginated list
+        # Mock paginated list that supports slicing
         mock_paginated_list = MagicMock()
-        mock_paginated_list.get_page.return_value.__getitem__ = MagicMock(return_value=[mock_repo])
+        mock_paginated_list.__getitem__ = MagicMock(return_value=[mock_repo])
         
         mock_user = MagicMock()
         mock_user.get_repos.return_value = mock_paginated_list

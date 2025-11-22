@@ -41,8 +41,9 @@ def connect_github_repository(request):
         try:
             g = Github(access_token)
             user = g.get_user()
-            # Limit to first 100 repos for performance
-            for repo in user.get_repos().get_page(0)[:100]:
+            # Limit to first 100 repos for performance (PyGithub handles pagination internally)
+            repos_list = list(user.get_repos()[:100])
+            for repo in repos_list:
                 github_repos.append({
                     'id': repo.id,
                     'name': repo.name,
