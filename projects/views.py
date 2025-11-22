@@ -41,7 +41,6 @@ def connect_github_repository(request):
         try:
             g = Github(access_token)
             user = g.get_user()
-            github_repos = []
             for repo in user.get_repos():
                 github_repos.append({
                     'id': repo.id,
