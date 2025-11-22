@@ -185,7 +185,35 @@ python manage.py migrate
 
 This creates the SQLite database and all necessary tables.
 
-### Step 6: Create a Superuser Account
+### Step 6: Set Up GitHub OAuth (Required)
+
+**Important**: GitHub OAuth authentication is required for users to connect and manage repositories.
+
+1. Create a GitHub OAuth App:
+   - Go to https://github.com/settings/developers
+   - Click "New OAuth App"
+   - Set **Homepage URL** to: `http://localhost:8000/`
+   - Set **Authorization callback URL** to: `http://localhost:8000/accounts/github/login/callback/`
+   - Note your **Client ID** and generate a **Client Secret**
+
+2. Configure NoHands:
+
+```bash
+# Set environment variables
+export GITHUB_CLIENT_ID="your_github_client_id"
+export GITHUB_CLIENT_SECRET="your_github_client_secret"
+
+# Run setup command
+python manage.py setup_github_oauth
+```
+
+The setup command will automatically configure the OAuth application in the database.
+
+See [GITHUB_OAUTH.md](GITHUB_OAUTH.md) for detailed instructions.
+
+### Step 7: Create a Superuser Account (Optional)
+
+While users can authenticate via GitHub, you may want to create a Django admin account:
 
 ```bash
 python manage.py createsuperuser
@@ -196,7 +224,9 @@ Follow the prompts to create an admin account:
 - Email: your-email@example.com
 - Password: (enter a secure password)
 
-### Step 7: Start the Development Server
+**Note**: The first user to connect via GitHub automatically becomes a superuser.
+
+### Step 8: Start the Development Server
 
 ```bash
 python manage.py runserver
@@ -204,7 +234,7 @@ python manage.py runserver
 
 The server will start at `http://localhost:8000/`
 
-### Step 8: Verify Installation
+### Step 9: Verify Installation
 
 Open your browser and navigate to:
 - **Web Interface**: http://localhost:8000/

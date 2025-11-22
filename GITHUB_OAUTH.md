@@ -14,7 +14,7 @@ NoHands now supports GitHub OAuth authentication, allowing users to:
 
 ### 1. Create a GitHub OAuth App
 
-1. Go to GitHub Settings → Developer settings → OAuth Apps
+1. Go to GitHub Settings → Developer settings → OAuth Apps (https://github.com/settings/developers)
 2. Click "New OAuth App"
 3. Fill in the application details:
    - **Application name**: NoHands (or your preferred name)
@@ -23,46 +23,48 @@ NoHands now supports GitHub OAuth authentication, allowing users to:
 4. Click "Register application"
 5. Note your **Client ID** and generate a **Client Secret**
 
-### 2. Configure NoHands
+### 2. Configure NoHands (Quick Setup)
 
-Set the following environment variables:
+The easiest way to configure GitHub OAuth is using the management command:
 
 ```bash
+# Set environment variables
 export GITHUB_CLIENT_ID="your_github_client_id"
 export GITHUB_CLIENT_SECRET="your_github_client_secret"
+
+# Run setup command
+python manage.py setup_github_oauth
 ```
 
-Or add them to your `.env` file:
+This will automatically:
+- Configure the Site settings
+- Create the GitHub Social Application
+- Link everything together
+
+For production, you can specify a custom domain:
 
 ```bash
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
+python manage.py setup_github_oauth --site-domain yourdomain.com
 ```
 
-### 3. Configure Social Application in Django Admin
+### Alternative: Manual Configuration via Django Admin
+
+If you prefer to configure manually:
 
 1. Start the Django server: `python manage.py runserver`
 2. Go to Django Admin: `http://localhost:8000/admin/`
-3. Navigate to **Social Applications** under **Sites**
-4. Click **Add Social Application**
-5. Fill in the form:
-   - **Provider**: GitHub
-   - **Name**: GitHub (or any name you prefer)
-   - **Client id**: Your GitHub OAuth App Client ID
-   - **Secret key**: Your GitHub OAuth App Client Secret
-   - **Sites**: Select your site (usually `example.com` or create a new one)
-6. Click **Save**
-
-### 4. Create a Site (if needed)
-
-If you don't have a site configured:
-
-1. Go to Django Admin: `http://localhost:8000/admin/`
-2. Navigate to **Sites**
-3. Edit the default site or add a new one:
+3. Navigate to **Sites** and update the default site:
    - **Domain name**: `localhost:8000` (for development) or your domain
    - **Display name**: NoHands
-4. Click **Save**
+4. Navigate to **Social Applications** under **Sites**
+5. Click **Add Social Application**
+6. Fill in the form:
+   - **Provider**: GitHub
+   - **Name**: GitHub
+   - **Client id**: Your GitHub OAuth App Client ID
+   - **Secret key**: Your GitHub OAuth App Client Secret
+   - **Sites**: Select your site
+7. Click **Save**
 
 ## Usage
 

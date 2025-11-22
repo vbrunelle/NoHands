@@ -41,13 +41,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',  # Required for allauth
     'rest_framework',
+    'projects',  # Must come before allauth to override templates
+    'builds',
+    'api',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.github',
-    'projects',
-    'builds',
-    'api',
 ]
 
 SITE_ID = 1
@@ -179,17 +179,14 @@ LOGIN_REDIRECT_URL = '/'
 LOGIN_URL = '/accounts/github/login/'
 LOGOUT_REDIRECT_URL = '/'
 
-# GitHub OAuth settings (from environment)
+# GitHub OAuth settings
+# Note: GitHub OAuth credentials must be configured using the setup_github_oauth management command
+# or via the Django admin panel. See GITHUB_OAUTH.md for instructions.
 SOCIALACCOUNT_PROVIDERS = {
     'github': {
         'SCOPE': [
             'user',
             'repo',
         ],
-        'APP': {
-            'client_id': os.environ.get('GITHUB_CLIENT_ID', ''),
-            'secret': os.environ.get('GITHUB_CLIENT_SECRET', ''),
-            'key': ''
-        }
     }
 }
