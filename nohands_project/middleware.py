@@ -2,7 +2,6 @@
 Middleware for NoHands project.
 """
 from django.shortcuts import redirect
-from django.urls import reverse
 from django.contrib.auth.models import User
 
 
@@ -18,8 +17,9 @@ class InitialSetupMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         # Paths that are always accessible even without users
+        # Using string paths instead of reverse() to avoid circular import issues
         self.exempt_paths = [
-            reverse('initial_setup'),
+            '/repositories/initial-setup/',  # Initial setup page
             '/accounts/',  # Allow all allauth URLs
             '/admin/',  # Allow admin access (for createsuperuser)
             '/static/',  # Allow static files
@@ -39,7 +39,7 @@ class InitialSetupMiddleware:
             
             if not is_exempt:
                 # Redirect to initial setup page
-                return redirect('initial_setup')
+                return redirect('/repositories/initial-setup/')
         
         response = self.get_response(request)
         return response

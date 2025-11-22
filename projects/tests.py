@@ -132,6 +132,12 @@ class RepositoryListViewTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('repository_list')
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
     
     def test_view_url_accessible(self):
         """Test that the view is accessible."""
@@ -159,6 +165,12 @@ class RepositoryDetailViewTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
         self.repo = GitRepository.objects.create(
             name="test-repo",
             url="https://github.com/test/repo.git",
@@ -200,6 +212,12 @@ class BranchCommitsViewTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
         self.repo = GitRepository.objects.create(
             name="test-repo",
             url="https://github.com/test/repo.git",
@@ -301,7 +319,8 @@ class ConnectGitHubRepositoryViewTest(TestCase):
         """Test that the view requires login."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('/accounts/login/', response.url)
+        # Now it redirects to GitHub login
+        self.assertIn('/accounts/github/login/', response.url)
     
     @patch('projects.views.SocialToken.objects.get')
     def test_view_redirects_without_github_token(self, mock_social_token):

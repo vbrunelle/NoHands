@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.urls import reverse
+from django.contrib.auth.models import User
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.utils import timezone
@@ -114,6 +115,10 @@ class GitRepositoryViewSetTest(APITestCase):
     
     def setUp(self):
         self.client = APIClient()
+        # Create and authenticate user
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.force_authenticate(user=self.user)
+        
         self.repo = GitRepository.objects.create(
             name='test-repo',
             url='https://github.com/test/repo.git',
@@ -140,6 +145,10 @@ class BranchViewSetTest(APITestCase):
     
     def setUp(self):
         self.client = APIClient()
+        # Create and authenticate user
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.force_authenticate(user=self.user)
+        
         self.repo = GitRepository.objects.create(
             name='test-repo',
             url='https://github.com/test/repo.git'
@@ -170,6 +179,10 @@ class CommitViewSetTest(APITestCase):
     
     def setUp(self):
         self.client = APIClient()
+        # Create and authenticate user
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.force_authenticate(user=self.user)
+        
         self.repo = GitRepository.objects.create(
             name='test-repo',
             url='https://github.com/test/repo.git'
@@ -216,6 +229,10 @@ class BuildViewSetTest(APITestCase):
     
     def setUp(self):
         self.client = APIClient()
+        # Create and authenticate user
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.force_authenticate(user=self.user)
+        
         self.repo = GitRepository.objects.create(
             name='test-repo',
             url='https://github.com/test/repo.git'
