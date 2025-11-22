@@ -3,76 +3,209 @@
 {% block title %}Build #{{ build.id }} - NoHands{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>Build #{{ build.id }}</h2>
-    <p><a href="{% url 'build_list' %}" class="btn btn-secondary">← Back to Builds</a></p>
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <a href="{% url 'build_list' %}" class="text-muted">
+                    <i class="ti ti-arrow-left icon me-1"></i>
+                    Back to builds
+                </a>
+            </div>
+            <h2 class="page-title">
+                <i class="ti ti-box icon me-2"></i>
+                Build #{{ build.id }}
+                <span class="badge badge-{{ build.status }} ms-2">
+                    {% if build.status == 'pending' %}
+                    <i class="ti ti-clock icon"></i>
+                    {% elif build.status == 'running' %}
+                    <i class="ti ti-loader icon"></i>
+                    {% elif build.status == 'success' %}
+                    <i class="ti ti-check icon"></i>
+                    {% elif build.status == 'failed' %}
+                    <i class="ti ti-x icon"></i>
+                    {% elif build.status == 'cancelled' %}
+                    <i class="ti ti-ban icon"></i>
+                    {% endif %}
+                    {{ build.get_status_display }}
+                </span>
+            </h2>
+        </div>
+        {% if build.status == 'pending' or build.status == 'running' %}
+        <div class="col-auto ms-auto d-print-none">
+            <button onclick="window.location.reload()" class="btn btn-primary">
+                <i class="ti ti-refresh icon"></i>
+                Refresh
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    <!-- Build Information Card -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Build Information</h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Repository</div>
+                        <div class="datagrid-content">
+                            <i class="ti ti-folder icon text-muted me-1"></i>
+                            {{ build.repository.name }}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Branch</div>
+                        <div class="datagrid-content">
+                            <span class="badge bg-blue-lt">
+                                <i class="ti ti-git-branch icon"></i>
+                                {{ build.branch_name }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Commit SHA</div>
+                        <div class="datagrid-content">
+                            <code>{{ build.commit.sha }}</code>
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Commit Message</div>
+                        <div class="datagrid-content">{{ build.commit.message }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Image Tag</div>
+                        <div class="datagrid-content">
+                            {% if build.image_tag %}
+                            <code>{{ build.image_tag }}</code>
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Push to Registry</div>
+                        <div class="datagrid-content">
+                            {% if build.push_to_registry %}
+                            <span class="badge bg-green-lt">
+                                <i class="ti ti-check icon"></i>
+                                Yes
+                            </span>
+                            {% else %}
+                            <span class="badge bg-gray-lt">No</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     
-    <table style="margin-top: 20px;">
-        <tr>
-            <th>Status</th>
-            <td><span class="status status-{{ build.status }}">{{ build.get_status_display }}</span></td>
-        </tr>
-        <tr>
-            <th>Repository</th>
-            <td>{{ build.repository.name }}</td>
-        </tr>
-        <tr>
-            <th>Branch</th>
-            <td>{{ build.branch_name }}</td>
-        </tr>
-        <tr>
-            <th>Commit</th>
-            <td><code>{{ build.commit.sha }}</code></td>
-        </tr>
-        <tr>
-            <th>Commit Message</th>
-            <td>{{ build.commit.message }}</td>
-        </tr>
-        <tr>
-            <th>Image Tag</th>
-            <td>{% if build.image_tag %}<code>{{ build.image_tag }}</code>{% else %}N/A{% endif %}</td>
-        </tr>
-        <tr>
-            <th>Push to Registry</th>
-            <td>{{ build.push_to_registry|yesno:"Yes,No" }}</td>
-        </tr>
-        <tr>
-            <th>Created</th>
-            <td>{{ build.created_at|date:"Y-m-d H:i:s" }}</td>
-        </tr>
-        <tr>
-            <th>Started</th>
-            <td>{% if build.started_at %}{{ build.started_at|date:"Y-m-d H:i:s" }}{% else %}N/A{% endif %}</td>
-        </tr>
-        <tr>
-            <th>Completed</th>
-            <td>{% if build.completed_at %}{{ build.completed_at|date:"Y-m-d H:i:s" }}{% else %}N/A{% endif %}</td>
-        </tr>
-        <tr>
-            <th>Duration</th>
-            <td>{{ build.duration }}</td>
-        </tr>
-    </table>
+    <!-- Build Timeline Card -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Timeline</h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Created</div>
+                        <div class="datagrid-content">
+                            <i class="ti ti-clock icon text-muted me-1"></i>
+                            {{ build.created_at|date:"Y-m-d H:i:s" }}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Started</div>
+                        <div class="datagrid-content">
+                            {% if build.started_at %}
+                            <i class="ti ti-player-play icon text-muted me-1"></i>
+                            {{ build.started_at|date:"Y-m-d H:i:s" }}
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Completed</div>
+                        <div class="datagrid-content">
+                            {% if build.completed_at %}
+                            <i class="ti ti-flag icon text-muted me-1"></i>
+                            {{ build.completed_at|date:"Y-m-d H:i:s" }}
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Duration</div>
+                        <div class="datagrid-content">
+                            <strong>{{ build.duration }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if build.error_message %}
+    <!-- Error Message Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title text-danger">
+                    <i class="ti ti-alert-circle icon me-2"></i>
+                    Error Message
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="logs">{{ build.error_message }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if build.logs %}
+    <!-- Build Logs Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-terminal icon me-2"></i>
+                    Build Logs
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="logs">{{ build.logs }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if build.status == 'pending' or build.status == 'running' %}
+    <!-- Status Notice Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-info mb-0">
+                    <div class="d-flex">
+                        <div>
+                            <i class="ti ti-info-circle icon alert-icon"></i>
+                        </div>
+                        <div>
+                            <h4 class="alert-title">Build {{ build.status }}</h4>
+                            <div class="text-muted">This build is currently {{ build.status }}. Refresh the page to see updates.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
-
-{% if build.error_message %}
-<div class="card">
-    <h3>Error Message</h3>
-    <div class="logs">{{ build.error_message }}</div>
-</div>
-{% endif %}
-
-{% if build.logs %}
-<div class="card">
-    <h3>Build Logs</h3>
-    <div class="logs">{{ build.logs }}</div>
-</div>
-{% endif %}
-
-{% if build.status == 'pending' or build.status == 'running' %}
-<div class="card">
-    <p><em>This build is currently {{ build.status }}. Refresh the page to see updates.</em></p>
-    <button onclick="window.location.reload()" class="btn">🔄 Refresh</button>
-</div>
-{% endif %}
 {% endblock %}
