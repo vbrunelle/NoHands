@@ -63,7 +63,9 @@
                             </td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <span class="avatar avatar-sm me-2" style="background-image: url(https://ui-avatars.com/api/?name={{ commit.author|urlencode }}&background=random)"></span>
+                                    <span class="avatar avatar-sm me-2">
+                                        {{ commit.author|slice:":1"|upper }}
+                                    </span>
                                     <span>{{ commit.author }}</span>
                                 </div>
                             </td>
