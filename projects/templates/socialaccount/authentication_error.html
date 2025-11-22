@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}GitHub OAuth Not Configured - NoHands{% endblock %}
+
+{% block content %}
+<div class="page page-center">
+    <div class="container container-tight py-4">
+        <div class="text-center mb-4">
+            <a href="/" class="navbar-brand navbar-brand-autodark">
+                <i class="ti ti-rocket icon me-2" style="font-size: 3rem; color: #667eea;"></i>
+            </a>
+        </div>
+        <div class="card card-md">
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="ti ti-alert-circle icon text-warning" style="font-size: 4rem;"></i>
+                </div>
+                
+                <h2 class="card-title mb-3">GitHub OAuth Not Configured</h2>
+                
+                <p class="text-muted mb-4">
+                    GitHub authentication is not set up yet. An administrator needs to configure 
+                    the GitHub OAuth application before users can connect.
+                </p>
+
+                <div class="alert alert-info text-start mb-4">
+                    <div class="d-flex">
+                        <div>
+                            <i class="ti ti-info-circle icon alert-icon"></i>
+                        </div>
+                        <div>
+                            <h4 class="alert-title">For Administrators</h4>
+                            <div class="text-muted">
+                                To configure GitHub OAuth, follow these steps:
+                                <ol class="mt-2 mb-0">
+                                    <li>Create a GitHub OAuth App at <a href="https://github.com/settings/developers" target="_blank">github.com/settings/developers</a></li>
+                                    <li>Set the callback URL to: <code>http://localhost:8000/accounts/github/login/callback/</code></li>
+                                    <li>Run the setup command:
+                                        <pre class="mt-2 mb-0"><code>export GITHUB_CLIENT_ID="your_client_id"
+export GITHUB_CLIENT_SECRET="your_client_secret"
+python manage.py setup_github_oauth</code></pre>
+                                    </li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <p class="text-muted small">
+                        See <a href="https://github.com/vbrunelle/NoHands/blob/main/GITHUB_OAUTH.md" target="_blank">GITHUB_OAUTH.md</a> 
+                        for detailed setup instructions.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center text-muted mt-3">
+            <small>
+                <a href="/" class="text-muted">← Back to NoHands</a>
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}

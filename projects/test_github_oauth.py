@@ -144,7 +144,10 @@ class GitHubLoginPageTest(TestCase):
         # Delete the social app
         AllauthSocialApp.objects.all().delete()
         
-        # Should raise an exception when OAuth app is not configured
-        with self.assertRaises(AllauthSocialApp.DoesNotExist):
-            response = self.client.get('/accounts/github/login/')
-            # The exception should be raised during request processing
+        # Should show a friendly error page instead of raising an exception
+        response = self.client.get('/accounts/github/login/')
+        
+        # Should return 500 with error page
+        self.assertEqual(response.status_code, 500)
+        self.assertContains(response, 'GitHub OAuth Not Configured', status_code=500)
+        self.assertContains(response, 'setup_github_oauth', status_code=500)

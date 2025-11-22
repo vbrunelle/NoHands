@@ -61,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'nohands_project.middleware.SocialAppErrorMiddleware',
     'nohands_project.middleware.InitialSetupMiddleware',
 ]
 
