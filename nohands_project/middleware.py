@@ -23,6 +23,7 @@ class InitialSetupMiddleware:
             '/accounts/',  # Allow all allauth URLs
             '/admin/',  # Allow admin access (for createsuperuser)
             '/static/',  # Allow static files
+            '/api/',  # Allow API access (DRF will handle authentication)
         ]
     
     def __call__(self, request):
