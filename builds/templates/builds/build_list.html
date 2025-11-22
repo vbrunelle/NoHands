@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Builds - NoHands{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Build History</h2>
+    
+    {% if builds %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Repository</th>
+                <th>Branch</th>
+                <th>Commit</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for build in builds %}
+            <tr>
+                <td><strong>#{{ build.id }}</strong></td>
+                <td>{{ build.repository.name }}</td>
+                <td>{{ build.branch_name }}</td>
+                <td><code>{{ build.commit.sha|slice:":8" }}</code></td>
+                <td><span class="status status-{{ build.status }}">{{ build.get_status_display }}</span></td>
+                <td>{{ build.duration }}</td>
+                <td>{{ build.created_at|date:"Y-m-d H:i" }}</td>
+                <td>
+                    <a href="{% url 'build_detail' build.id %}" class="btn">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No builds yet. Trigger a build from a repository's commits page.</p>
+    {% endif %}
+</div>
+{% endblock %}

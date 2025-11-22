@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ repository.name }} - NoHands{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>{{ repository.name }}</h2>
+    <p><strong>URL:</strong> <code>{{ repository.url }}</code></p>
+    <p><strong>Default Branch:</strong> {{ repository.default_branch }}</p>
+    {% if repository.description %}
+    <p><strong>Description:</strong> {{ repository.description }}</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>Branches</h3>
+    <form method="post" style="margin-bottom: 20px;">
+        {% csrf_token %}
+        <button type="submit" name="refresh_branches" class="btn btn-secondary">🔄 Refresh Branches</button>
+    </form>
+    
+    {% if branches %}
+    <table>
+        <thead>
+            <tr>
+                <th>Branch Name</th>
+                <th>Latest Commit</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for branch in branches %}
+            <tr>
+                <td><strong>{{ branch.name }}</strong></td>
+                <td><code>{{ branch.commit_sha|slice:":8" }}</code></td>
+                <td>
+                    <a href="{% url 'branch_commits' repository.id branch.id %}" class="btn">View Commits</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No branches found. Click "Refresh Branches" to fetch from repository.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>Recent Commits</h3>
+    {% if recent_commits %}
+    <table>
+        <thead>
+            <tr>
+                <th>SHA</th>
+                <th>Message</th>
+                <th>Author</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for commit in recent_commits %}
+            <tr>
+                <td><code>{{ commit.sha|slice:":8" }}</code></td>
+                <td>{{ commit.message|truncatewords:10 }}</td>
+                <td>{{ commit.author }}</td>
+                <td>{{ commit.committed_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No commits available.</p>
+    {% endif %}
+</div>
+{% endblock %}
