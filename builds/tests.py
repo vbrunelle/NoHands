@@ -3,7 +3,6 @@ from django.urls import reverse
 from django.utils import timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-import threading
 
 from .models import Build
 from projects.models import GitRepository, Branch, Commit
