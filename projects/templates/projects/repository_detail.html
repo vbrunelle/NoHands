@@ -3,73 +3,176 @@
 {% block title %}{{ repository.name }} - NoHands{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>{{ repository.name }}</h2>
-    <p><strong>URL:</strong> <code>{{ repository.url }}</code></p>
-    <p><strong>Default Branch:</strong> {{ repository.default_branch }}</p>
-    {% if repository.description %}
-    <p><strong>Description:</strong> {{ repository.description }}</p>
-    {% endif %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <a href="{% url 'repository_list' %}" class="text-muted">
+                    <i class="ti ti-arrow-left icon me-1"></i>
+                    Back to repositories
+                </a>
+            </div>
+            <h2 class="page-title">
+                <i class="ti ti-folder icon me-2"></i>
+                {{ repository.name }}
+            </h2>
+        </div>
+    </div>
 </div>
 
-<div class="card">
-    <h3>Branches</h3>
-    <form method="post" style="margin-bottom: 20px;">
-        {% csrf_token %}
-        <button type="submit" name="refresh_branches" class="btn btn-secondary">🔄 Refresh Branches</button>
-    </form>
+<div class="row row-cards mt-3">
+    <!-- Repository Info Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">Repository Information</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1">Repository URL</div>
+                            <code>{{ repository.url }}</code>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1">Default Branch</div>
+                            <span class="badge bg-blue-lt">{{ repository.default_branch }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1">Status</div>
+                            <span class="badge bg-green-lt">
+                                <i class="ti ti-check icon"></i>
+                                Active
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% if repository.description %}
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Description</div>
+                    <p class="text-muted mb-0">{{ repository.description }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
     
-    {% if branches %}
-    <table>
-        <thead>
-            <tr>
-                <th>Branch Name</th>
-                <th>Latest Commit</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for branch in branches %}
-            <tr>
-                <td><strong>{{ branch.name }}</strong></td>
-                <td><code>{{ branch.commit_sha|slice:":8" }}</code></td>
-                <td>
-                    <a href="{% url 'branch_commits' repository.id branch.id %}" class="btn">View Commits</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No branches found. Click "Refresh Branches" to fetch from repository.</p>
-    {% endif %}
-</div>
-
-<div class="card">
-    <h3>Recent Commits</h3>
-    {% if recent_commits %}
-    <table>
-        <thead>
-            <tr>
-                <th>SHA</th>
-                <th>Message</th>
-                <th>Author</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for commit in recent_commits %}
-            <tr>
-                <td><code>{{ commit.sha|slice:":8" }}</code></td>
-                <td>{{ commit.message|truncatewords:10 }}</td>
-                <td>{{ commit.author }}</td>
-                <td>{{ commit.committed_at|date:"Y-m-d H:i" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No commits available.</p>
-    {% endif %}
+    <!-- Branches Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-git-branch icon me-2"></i>
+                    Branches
+                </h3>
+                <div class="card-actions">
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" name="refresh_branches" class="btn btn-primary btn-sm">
+                            <i class="ti ti-refresh icon"></i>
+                            Refresh Branches
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% if branches %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Branch Name</th>
+                            <th>Latest Commit</th>
+                            <th class="w-1"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for branch in branches %}
+                        <tr>
+                            <td>
+                                <i class="ti ti-git-branch icon text-muted me-2"></i>
+                                <strong>{{ branch.name }}</strong>
+                            </td>
+                            <td>
+                                <code class="small">{{ branch.commit_sha|slice:":8" }}</code>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'branch_commits' repository.id branch.id %}" class="btn btn-sm btn-primary">
+                                    <i class="ti ti-list icon"></i>
+                                    View Commits
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-git-branch icon"></i>
+                    </div>
+                    <p class="empty-title">No branches found</p>
+                    <p class="empty-subtitle text-muted">
+                        Click "Refresh Branches" to fetch from repository
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Recent Commits Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-git-commit icon me-2"></i>
+                    Recent Commits
+                </h3>
+            </div>
+            {% if recent_commits %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-striped">
+                    <thead>
+                        <tr>
+                            <th>SHA</th>
+                            <th>Message</th>
+                            <th>Author</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for commit in recent_commits %}
+                        <tr>
+                            <td><code class="small">{{ commit.sha|slice:":8" }}</code></td>
+                            <td>{{ commit.message|truncatewords:10 }}</td>
+                            <td>
+                                <i class="ti ti-user icon text-muted me-1"></i>
+                                {{ commit.author }}
+                            </td>
+                            <td class="text-muted">{{ commit.committed_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-git-commit icon"></i>
+                    </div>
+                    <p class="empty-title">No commits available</p>
+                    <p class="empty-subtitle text-muted">
+                        Commits will appear here after refreshing branches
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

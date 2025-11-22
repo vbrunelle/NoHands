@@ -3,45 +3,110 @@
 {% block title %}{{ branch.name }} - {{ repository.name }} - NoHands{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>{{ repository.name }} / {{ branch.name }}</h2>
-    <p><a href="{% url 'repository_detail' repository.id %}" class="btn btn-secondary">← Back to Repository</a></p>
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <a href="{% url 'repository_detail' repository.id %}" class="text-muted">
+                    <i class="ti ti-arrow-left icon me-1"></i>
+                    Back to {{ repository.name }}
+                </a>
+            </div>
+            <h2 class="page-title">
+                <i class="ti ti-git-branch icon me-2"></i>
+                {{ repository.name }} / {{ branch.name }}
+            </h2>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            <form method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" name="refresh_commits" class="btn btn-primary">
+                    <i class="ti ti-refresh icon"></i>
+                    Refresh Commits
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
-<div class="card">
-    <h3>Commits</h3>
-    <form method="post" style="margin-bottom: 20px;">
-        {% csrf_token %}
-        <button type="submit" name="refresh_commits" class="btn btn-secondary">🔄 Refresh Commits</button>
-    </form>
-    
-    {% if commits %}
-    <table>
-        <thead>
-            <tr>
-                <th>SHA</th>
-                <th>Message</th>
-                <th>Author</th>
-                <th>Date</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for commit in commits %}
-            <tr>
-                <td><code>{{ commit.sha|slice:":8" }}</code></td>
-                <td>{{ commit.message|truncatewords:15 }}</td>
-                <td>{{ commit.author }}</td>
-                <td>{{ commit.committed_at|date:"Y-m-d H:i" }}</td>
-                <td>
-                    <a href="{% url 'build_create' repository.id commit.id %}" class="btn btn-success">🚀 Build</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No commits found. Click "Refresh Commits" to fetch from repository.</p>
-    {% endif %}
+<div class="row row-cards mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-git-commit icon me-2"></i>
+                    Commits
+                </h3>
+            </div>
+            {% if commits %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                        <tr>
+                            <th>SHA</th>
+                            <th>Message</th>
+                            <th>Author</th>
+                            <th>Date</th>
+                            <th class="w-1"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for commit in commits %}
+                        <tr>
+                            <td>
+                                <code class="small">{{ commit.sha|slice:":8" }}</code>
+                            </td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 400px;">
+                                    {{ commit.message|truncatewords:15 }}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="avatar avatar-sm me-2">
+                                        {{ commit.author|slice:":1"|upper }}
+                                    </span>
+                                    <span>{{ commit.author }}</span>
+                                </div>
+                            </td>
+                            <td class="text-muted">
+                                <i class="ti ti-clock icon me-1"></i>
+                                {{ commit.committed_at|date:"Y-m-d H:i" }}
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'build_create' repository.id commit.id %}" class="btn btn-success btn-sm">
+                                    <i class="ti ti-rocket icon"></i>
+                                    Build
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-git-commit icon"></i>
+                    </div>
+                    <p class="empty-title">No commits found</p>
+                    <p class="empty-subtitle text-muted">
+                        Click "Refresh Commits" to fetch from repository
+                    </p>
+                    <div class="empty-action">
+                        <form method="post">
+                            {% csrf_token %}
+                            <button type="submit" name="refresh_commits" class="btn btn-primary">
+                                <i class="ti ti-refresh icon"></i>
+                                Refresh Commits
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

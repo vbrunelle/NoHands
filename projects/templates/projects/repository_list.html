@@ -3,34 +3,78 @@
 {% block title %}Repositories - NoHands{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>Git Repositories</h2>
-    
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="ti ti-git-branch icon me-2"></i>
+                Git Repositories
+            </h2>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            <a href="/admin/projects/gitrepository/add/" class="btn btn-primary">
+                <i class="ti ti-plus icon"></i>
+                Add Repository
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
     {% if repositories %}
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>URL</th>
-                <th>Default Branch</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for repo in repositories %}
-            <tr>
-                <td><strong>{{ repo.name }}</strong></td>
-                <td><code>{{ repo.url }}</code></td>
-                <td>{{ repo.default_branch }}</td>
-                <td>
-                    <a href="{% url 'repository_detail' repo.id %}" class="btn">View Details</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        {% for repo in repositories %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">
+                        <i class="ti ti-folder icon me-2"></i>
+                        {{ repo.name }}
+                    </h3>
+                    <div class="mb-3">
+                        <div class="text-muted small mb-1">Repository URL</div>
+                        <code class="small text-truncate d-block" style="max-width: 300px;">{{ repo.url }}</code>
+                    </div>
+                    <div class="mb-3">
+                        <div class="text-muted small mb-1">Default Branch</div>
+                        <span class="badge bg-blue-lt">{{ repo.default_branch }}</span>
+                    </div>
+                    {% if repo.description %}
+                    <div class="mb-3">
+                        <div class="text-muted small">{{ repo.description }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'repository_detail' repo.id %}" class="btn btn-primary w-100">
+                        <i class="ti ti-eye icon"></i>
+                        View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     {% else %}
-    <p>No repositories configured yet. Add one in the <a href="/admin/">admin panel</a>.</p>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty">
+                        <div class="empty-icon">
+                            <i class="ti ti-folder-off icon"></i>
+                        </div>
+                        <p class="empty-title">No repositories found</p>
+                        <p class="empty-subtitle text-muted">
+                            Get started by adding your first repository
+                        </p>
+                        <div class="empty-action">
+                            <a href="/admin/projects/gitrepository/add/" class="btn btn-primary">
+                                <i class="ti ti-plus icon"></i>
+                                Add Repository
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     {% endif %}
 </div>
 {% endblock %}
