@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,8 @@ class GitRepository(models.Model):
     is_active = models.BooleanField(default=True, help_text="Whether this repository is active")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='repositories', help_text="User who connected this repository")
+    github_id = models.CharField(max_length=100, blank=True, help_text="GitHub repository ID")
 
     class Meta:
         verbose_name = "Git Repository"

@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Connect GitHub Repository - NoHands{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="ti ti-brand-github icon me-2"></i>
+                Connect GitHub Repository
+            </h2>
+            <div class="text-muted mt-1">
+                Select a repository from your GitHub account to connect to NoHands
+            </div>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            <a href="{% url 'repository_list' %}" class="btn">
+                <i class="ti ti-arrow-left icon"></i>
+                Back to Repositories
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    {% if github_repos %}
+        {% for repo in github_repos %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">
+                        <i class="ti ti-folder icon me-2"></i>
+                        {{ repo.name }}
+                        {% if repo.private %}
+                        <span class="badge bg-warning-lt ms-2">
+                            <i class="ti ti-lock icon"></i>
+                            Private
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success-lt ms-2">
+                            <i class="ti ti-lock-open icon"></i>
+                            Public
+                        </span>
+                        {% endif %}
+                    </h3>
+                    <div class="text-muted small mb-2">{{ repo.full_name }}</div>
+                    {% if repo.description %}
+                    <div class="mb-3">
+                        <div class="text-muted">{{ repo.description }}</div>
+                    </div>
+                    {% endif %}
+                    <div class="mb-3">
+                        <div class="text-muted small mb-1">Default Branch</div>
+                        <span class="badge bg-blue-lt">{{ repo.default_branch }}</span>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <form method="post" class="w-100">
+                        {% csrf_token %}
+                        <input type="hidden" name="repo_id" value="{{ repo.id }}">
+                        <input type="hidden" name="repo_name" value="{{ repo.full_name }}">
+                        <input type="hidden" name="repo_url" value="{{ repo.clone_url }}">
+                        <input type="hidden" name="repo_description" value="{{ repo.description }}">
+                        <input type="hidden" name="default_branch" value="{{ repo.default_branch }}">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="ti ti-plug icon"></i>
+                            Connect Repository
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty">
+                        <div class="empty-icon">
+                            <i class="ti ti-brand-github icon"></i>
+                        </div>
+                        <p class="empty-title">No GitHub repositories found</p>
+                        <p class="empty-subtitle text-muted">
+                            Make sure you're logged in with your GitHub account and have repositories available.
+                        </p>
+                        <div class="empty-action">
+                            <a href="{% url 'repository_list' %}" class="btn btn-primary">
+                                <i class="ti ti-arrow-left icon"></i>
+                                Back to Repositories
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
