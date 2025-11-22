@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.conf import settings
 from pathlib import Path
 import logging
@@ -13,6 +14,24 @@ from .git_utils import clone_or_update_repo, list_branches, list_commits, GitUti
 logger = logging.getLogger(__name__)
 
 
+def initial_setup(request):
+    """
+    Initial setup page for first-time server access.
+    
+    This page is displayed when no users exist in the system.
+    The user must connect via GitHub OAuth to create the first admin account.
+    """
+    # Check if users already exist
+    has_users = User.objects.exists()
+    
+    if has_users:
+        # If users exist, redirect to the main page
+        return redirect('repository_list')
+    
+    return render(request, 'projects/initial_setup.html')
+
+
+@login_required
 def repository_list(request):
     """List all Git repositories."""
     repositories = GitRepository.objects.filter(is_active=True)
@@ -94,6 +113,7 @@ def connect_github_repository(request):
     })
 
 
+@login_required
 def repository_detail(request, repo_id):
     """View repository details and branches."""
     repository = get_object_or_404(GitRepository, id=repo_id)
@@ -132,6 +152,7 @@ def repository_detail(request, repo_id):
     })
 
 
+@login_required
 def branch_commits(request, repo_id, branch_id):
     """List commits for a specific branch."""
     repository = get_object_or_404(GitRepository, id=repo_id)

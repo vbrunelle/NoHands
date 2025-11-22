@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Initial Setup - NoHands{% endblock %}
+
+{% block content %}
+<div class="page-center">
+    <div class="container container-tight py-4">
+        <div class="text-center mb-4">
+            <a href="." class="navbar-brand navbar-brand-autodark">
+                <i class="ti ti-rocket icon me-2" style="font-size: 3rem;"></i>
+            </a>
+        </div>
+        <div class="card card-md">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">Welcome to NoHands!</h2>
+                <p class="text-muted text-center mb-4">
+                    This is your first time accessing NoHands. To get started, you need to connect your GitHub account.
+                </p>
+                
+                <div class="alert alert-info" role="alert">
+                    <div class="d-flex">
+                        <div>
+                            <i class="ti ti-info-circle icon alert-icon"></i>
+                        </div>
+                        <div>
+                            <h4 class="alert-title">First User Becomes Admin</h4>
+                            <div class="text-muted">
+                                The first account to connect via GitHub will automatically become the server administrator 
+                                with full access to all features and settings.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="h4 mb-3">What you can do after connecting:</h3>
+                    <ul class="list-unstyled space-y-1">
+                        <li class="d-flex align-items-center">
+                            <i class="ti ti-check icon text-success me-2"></i>
+                            <span>Browse and connect your GitHub repositories</span>
+                        </li>
+                        <li class="d-flex align-items-center">
+                            <i class="ti ti-check icon text-success me-2"></i>
+                            <span>Trigger Docker image builds from any commit</span>
+                        </li>
+                        <li class="d-flex align-items-center">
+                            <i class="ti ti-check icon text-success me-2"></i>
+                            <span>Monitor build status and view logs</span>
+                        </li>
+                        <li class="d-flex align-items-center">
+                            <i class="ti ti-check icon text-success me-2"></i>
+                            <span>Access the admin interface</span>
+                        </li>
+                        <li class="d-flex align-items-center">
+                            <i class="ti ti-check icon text-success me-2"></i>
+                            <span>Use the REST API for automation</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="form-footer text-center">
+                    <a href="/accounts/github/login/?process=login" class="btn btn-primary w-100 btn-lg">
+                        <i class="ti ti-brand-github icon me-2"></i>
+                        Connect with GitHub
+                    </a>
+                </div>
+
+                <div class="hr-text mt-4">Alternative</div>
+                
+                <div class="text-center text-muted mt-3">
+                    <small>
+                        Advanced users can also create an admin account using:<br>
+                        <code>python manage.py createsuperuser</code>
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center text-muted mt-3">
+            <small>
+                NoHands - CI/CD Platform powered by Dagger and Django
+            </small>
+        </div>
+    </div>
+</div>
+{% endblock %}

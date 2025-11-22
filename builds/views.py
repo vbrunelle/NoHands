@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.utils import timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ from .dagger_pipeline import run_build_sync
 logger = logging.getLogger(__name__)
 
 
+@login_required
 def build_list(request):
     """List all builds."""
     builds = Build.objects.select_related('repository', 'commit').all()
@@ -22,6 +24,7 @@ def build_list(request):
     })
 
 
+@login_required
 def build_detail(request, build_id):
     """View build details and logs."""
     build = get_object_or_404(Build, id=build_id)
@@ -30,6 +33,7 @@ def build_detail(request, build_id):
     })
 
 
+@login_required
 def build_create(request, repo_id, commit_id):
     """Create a new build for a specific commit."""
     repository = get_object_or_404(GitRepository, id=repo_id)
