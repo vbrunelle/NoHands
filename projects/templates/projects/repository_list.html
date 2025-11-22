@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Repositories - NoHands{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Git Repositories</h2>
+    
+    {% if repositories %}
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Default Branch</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for repo in repositories %}
+            <tr>
+                <td><strong>{{ repo.name }}</strong></td>
+                <td><code>{{ repo.url }}</code></td>
+                <td>{{ repo.default_branch }}</td>
+                <td>
+                    <a href="{% url 'repository_detail' repo.id %}" class="btn">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No repositories configured yet. Add one in the <a href="/admin/">admin panel</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}

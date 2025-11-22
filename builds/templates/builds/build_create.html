@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Build - NoHands{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Create New Build</h2>
+    
+    <table style="margin-top: 20px; margin-bottom: 20px;">
+        <tr>
+            <th>Repository</th>
+            <td>{{ repository.name }}</td>
+        </tr>
+        <tr>
+            <th>Commit SHA</th>
+            <td><code>{{ commit.sha }}</code></td>
+        </tr>
+        <tr>
+            <th>Commit Message</th>
+            <td>{{ commit.message }}</td>
+        </tr>
+        <tr>
+            <th>Author</th>
+            <td>{{ commit.author }}</td>
+        </tr>
+        <tr>
+            <th>Date</th>
+            <td>{{ commit.committed_at|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+    </table>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 15px;">
+            <label>
+                <input type="checkbox" name="push_to_registry">
+                Push to Docker Registry
+            </label>
+        </div>
+        
+        <button type="submit" class="btn btn-success">🚀 Start Build</button>
+        <a href="{% url 'repository_detail' repository.id %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

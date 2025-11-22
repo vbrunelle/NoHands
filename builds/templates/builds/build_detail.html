@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Build #{{ build.id }} - NoHands{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Build #{{ build.id }}</h2>
+    <p><a href="{% url 'build_list' %}" class="btn btn-secondary">← Back to Builds</a></p>
+    
+    <table style="margin-top: 20px;">
+        <tr>
+            <th>Status</th>
+            <td><span class="status status-{{ build.status }}">{{ build.get_status_display }}</span></td>
+        </tr>
+        <tr>
+            <th>Repository</th>
+            <td>{{ build.repository.name }}</td>
+        </tr>
+        <tr>
+            <th>Branch</th>
+            <td>{{ build.branch_name }}</td>
+        </tr>
+        <tr>
+            <th>Commit</th>
+            <td><code>{{ build.commit.sha }}</code></td>
+        </tr>
+        <tr>
+            <th>Commit Message</th>
+            <td>{{ build.commit.message }}</td>
+        </tr>
+        <tr>
+            <th>Image Tag</th>
+            <td>{% if build.image_tag %}<code>{{ build.image_tag }}</code>{% else %}N/A{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Push to Registry</th>
+            <td>{{ build.push_to_registry|yesno:"Yes,No" }}</td>
+        </tr>
+        <tr>
+            <th>Created</th>
+            <td>{{ build.created_at|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+        <tr>
+            <th>Started</th>
+            <td>{% if build.started_at %}{{ build.started_at|date:"Y-m-d H:i:s" }}{% else %}N/A{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Completed</th>
+            <td>{% if build.completed_at %}{{ build.completed_at|date:"Y-m-d H:i:s" }}{% else %}N/A{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Duration</th>
+            <td>{{ build.duration }}</td>
+        </tr>
+    </table>
+</div>
+
+{% if build.error_message %}
+<div class="card">
+    <h3>Error Message</h3>
+    <div class="logs">{{ build.error_message }}</div>
+</div>
+{% endif %}
+
+{% if build.logs %}
+<div class="card">
+    <h3>Build Logs</h3>
+    <div class="logs">{{ build.logs }}</div>
+</div>
+{% endif %}
+
+{% if build.status == 'pending' or build.status == 'running' %}
+<div class="card">
+    <p><em>This build is currently {{ build.status }}. Refresh the page to see updates.</em></p>
+    <button onclick="window.location.reload()" class="btn">🔄 Refresh</button>
+</div>
+{% endif %}
+{% endblock %}

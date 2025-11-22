@@ -1,0 +1,276 @@
+from django.test import TestCase, Client
+from django.urls import reverse
+from django.utils import timezone
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+from datetime import datetime
+
+from .models import GitRepository, Branch, Commit
+from .git_utils import GitUtilsError
+
+
+class GitRepositoryModelTest(TestCase):
+    """Tests for GitRepository model."""
+    
+    def setUp(self):
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git",
+            description="Test repository",
+            default_branch="main",
+            dockerfile_path="Dockerfile",
+            is_active=True
+        )
+    
+    def test_repository_creation(self):
+        """Test that repository is created correctly."""
+        self.assertEqual(self.repo.name, "test-repo")
+        self.assertEqual(self.repo.url, "https://github.com/test/repo.git")
+        self.assertEqual(self.repo.default_branch, "main")
+        self.assertTrue(self.repo.is_active)
+    
+    def test_repository_str(self):
+        """Test string representation."""
+        self.assertEqual(str(self.repo), "test-repo")
+    
+    def test_repository_ordering(self):
+        """Test repositories are ordered by creation date."""
+        repo2 = GitRepository.objects.create(
+            name="test-repo-2",
+            url="https://github.com/test/repo2.git"
+        )
+        repos = list(GitRepository.objects.all())
+        self.assertEqual(repos[0], repo2)  # Most recent first
+
+
+class BranchModelTest(TestCase):
+    """Tests for Branch model."""
+    
+    def setUp(self):
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123def456"
+        )
+    
+    def test_branch_creation(self):
+        """Test that branch is created correctly."""
+        self.assertEqual(self.branch.name, "main")
+        self.assertEqual(self.branch.commit_sha, "abc123def456")
+        self.assertEqual(self.branch.repository, self.repo)
+    
+    def test_branch_str(self):
+        """Test string representation."""
+        self.assertEqual(str(self.branch), "test-repo/main")
+    
+    def test_branch_unique_constraint(self):
+        """Test that repository+name must be unique."""
+        with self.assertRaises(Exception):
+            Branch.objects.create(
+                repository=self.repo,
+                name="main",
+                commit_sha="xyz789"
+            )
+
+
+class CommitModelTest(TestCase):
+    """Tests for Commit model."""
+    
+    def setUp(self):
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456789",
+            message="Initial commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_commit_creation(self):
+        """Test that commit is created correctly."""
+        self.assertEqual(self.commit.sha, "abc123def456789")
+        self.assertEqual(self.commit.message, "Initial commit")
+        self.assertEqual(self.commit.author, "Test Author")
+        self.assertEqual(self.commit.author_email, "test@example.com")
+    
+    def test_commit_str(self):
+        """Test string representation."""
+        self.assertIn("abc123de", str(self.commit))
+        self.assertIn("Initial commit", str(self.commit))
+
+
+class RepositoryListViewTest(TestCase):
+    """Tests for repository list view."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('repository_list')
+    
+    def test_view_url_accessible(self):
+        """Test that the view is accessible."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_view_uses_correct_template(self):
+        """Test that correct template is used."""
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, 'projects/repository_list.html')
+    
+    def test_view_shows_repositories(self):
+        """Test that repositories are displayed."""
+        GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git",
+            is_active=True
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "test-repo")
+
+
+class RepositoryDetailViewTest(TestCase):
+    """Tests for repository detail view."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git",
+            is_active=True
+        )
+        self.url = reverse('repository_detail', args=[self.repo.id])
+    
+    def test_view_url_accessible(self):
+        """Test that the view is accessible."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_view_uses_correct_template(self):
+        """Test that correct template is used."""
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, 'projects/repository_detail.html')
+    
+    def test_view_shows_repository_info(self):
+        """Test that repository info is displayed."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "test-repo")
+        self.assertContains(response, self.repo.url)
+    
+    @patch('projects.views.clone_or_update_repo')
+    @patch('projects.views.list_branches')
+    def test_refresh_branches(self, mock_list_branches, mock_clone):
+        """Test refreshing branches."""
+        mock_list_branches.return_value = [
+            {'name': 'main', 'commit_sha': 'abc123', 'last_commit_date': timezone.now()}
+        ]
+        
+        response = self.client.post(self.url, {'refresh_branches': 'true'})
+        self.assertEqual(response.status_code, 302)  # Redirect
+        self.assertTrue(Branch.objects.filter(repository=self.repo, name='main').exists())
+
+
+class BranchCommitsViewTest(TestCase):
+    """Tests for branch commits view."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git",
+            is_active=True
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.url = reverse('branch_commits', args=[self.repo.id, self.branch.id])
+    
+    def test_view_url_accessible(self):
+        """Test that the view is accessible."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_view_uses_correct_template(self):
+        """Test that correct template is used."""
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, 'projects/branch_commits.html')
+    
+    def test_view_shows_commits(self):
+        """Test that commits are displayed."""
+        commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "abc123de")
+
+
+class GitUtilsTest(TestCase):
+    """Tests for Git utilities."""
+    
+    @patch('projects.git_utils.Repo')
+    def test_clone_or_update_repo_clone(self, mock_repo_class):
+        """Test cloning a new repository."""
+        from projects.git_utils import clone_or_update_repo
+        
+        mock_repo = MagicMock()
+        mock_repo_class.clone_from.return_value = mock_repo
+        
+        result = clone_or_update_repo(
+            "https://github.com/test/repo.git",
+            Path("/tmp/test-repo")
+        )
+        
+        self.assertEqual(result, mock_repo)
+        mock_repo_class.clone_from.assert_called_once()
+    
+    @patch('projects.git_utils.Repo')
+    def test_list_branches(self, mock_repo_class):
+        """Test listing branches."""
+        from projects.git_utils import list_branches
+        import git
+        
+        # Create mock branch
+        mock_commit = MagicMock()
+        mock_commit.hexsha = "abc123"
+        mock_commit.committed_date = 1234567890
+        
+        mock_branch = MagicMock(spec=git.Head)
+        mock_branch.name = "main"
+        mock_branch.commit = mock_commit
+        
+        mock_repo = MagicMock()
+        mock_repo.references = [mock_branch]
+        mock_repo_class.return_value = mock_repo
+        
+        branches = list_branches(Path("/tmp/test-repo"))
+        
+        self.assertEqual(len(branches), 1)
+        self.assertEqual(branches[0]['name'], 'main')
+        self.assertEqual(branches[0]['commit_sha'], 'abc123')
+    
+    def test_git_utils_error(self):
+        """Test GitUtilsError exception."""
+        from projects.git_utils import GitUtilsError
+        
+        with self.assertRaises(GitUtilsError):
+            raise GitUtilsError("Test error")
