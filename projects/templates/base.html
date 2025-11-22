@@ -51,6 +51,37 @@
                     </a>
                 </h1>
                 <div class="navbar-nav flex-row order-md-last">
+                    {% if user.is_authenticated %}
+                    <div class="nav-item dropdown d-none d-md-flex me-3">
+                        <a href="#" class="nav-link px-0 text-white" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show user menu">
+                            <span class="avatar avatar-sm" style="background-color: #667eea;">
+                                {{ user.username|slice:":2"|upper }}
+                            </span>
+                            <div class="d-none d-xl-block ps-2">
+                                <div>{{ user.username }}</div>
+                                <div class="mt-1 small text-white-50">{{ user.email }}</div>
+                            </div>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                            <a href="{% url 'account_email' %}" class="dropdown-item">Account Settings</a>
+                            <a href="{% url 'socialaccount_connections' %}" class="dropdown-item">Connected Accounts</a>
+                            <div class="dropdown-divider"></div>
+                            <form method="post" action="{% url 'account_logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item">Logout</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="nav-item d-none d-md-flex me-3">
+                        <div class="btn-list">
+                            <a href="{% url 'account_login' %}" class="btn btn-white">
+                                <i class="ti ti-login icon"></i>
+                                Login
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="nav-item d-none d-md-flex me-3">
                         <div class="btn-list">
                             <a href="/admin/" class="btn btn-white" target="_blank">

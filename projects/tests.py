@@ -1,5 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.contrib.auth.models import User
 from django.utils import timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -28,6 +29,18 @@ class GitRepositoryModelTest(TestCase):
         self.assertEqual(self.repo.url, "https://github.com/test/repo.git")
         self.assertEqual(self.repo.default_branch, "main")
         self.assertTrue(self.repo.is_active)
+    
+    def test_repository_with_user(self):
+        """Test repository creation with user association."""
+        user = User.objects.create_user(username='testuser', password='testpass')
+        repo = GitRepository.objects.create(
+            name="user-repo",
+            url="https://github.com/user/repo.git",
+            user=user,
+            github_id="12345"
+        )
+        self.assertEqual(repo.user, user)
+        self.assertEqual(repo.github_id, "12345")
     
     def test_repository_str(self):
         """Test string representation."""
@@ -274,3 +287,122 @@ class GitUtilsTest(TestCase):
         
         with self.assertRaises(GitUtilsError):
             raise GitUtilsError("Test error")
+
+
+class ConnectGitHubRepositoryViewTest(TestCase):
+    """Tests for connecting GitHub repositories."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.url = reverse('connect_github_repository')
+    
+    def test_view_requires_authentication(self):
+        """Test that the view requires login."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+        self.assertIn('/accounts/login/', response.url)
+    
+    @patch('projects.views.SocialToken.objects.get')
+    def test_view_redirects_without_github_token(self, mock_social_token):
+        """Test redirect when user has no GitHub token."""
+        from allauth.socialaccount.models import SocialToken
+        mock_social_token.side_effect = SocialToken.DoesNotExist
+        
+        self.client.login(username='testuser', password='testpass')
+        response = self.client.get(self.url)
+        
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('repository_list'))
+    
+    @patch('projects.views.Github')
+    @patch('projects.views.SocialToken.objects.get')
+    def test_view_displays_github_repos(self, mock_social_token, mock_github_class):
+        """Test that GitHub repositories are displayed."""
+        # Mock social token
+        mock_token = MagicMock()
+        mock_token.token = 'fake_token'
+        mock_social_token.return_value = mock_token
+        
+        # Mock GitHub API
+        mock_repo = MagicMock()
+        mock_repo.id = 123
+        mock_repo.name = 'test-repo'
+        mock_repo.full_name = 'testuser/test-repo'
+        mock_repo.description = 'Test repository'
+        mock_repo.clone_url = 'https://github.com/testuser/test-repo.git'
+        mock_repo.default_branch = 'main'
+        mock_repo.private = False
+        
+        # Mock paginated list that supports slicing
+        mock_paginated_list = MagicMock()
+        mock_paginated_list.__getitem__ = MagicMock(return_value=[mock_repo])
+        
+        mock_user = MagicMock()
+        mock_user.get_repos.return_value = mock_paginated_list
+        
+        mock_github = MagicMock()
+        mock_github.get_user.return_value = mock_user
+        mock_github_class.return_value = mock_github
+        
+        self.client.login(username='testuser', password='testpass')
+        response = self.client.get(self.url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'test-repo')
+        self.assertContains(response, 'testuser/test-repo')
+    
+    @patch('projects.views.SocialToken.objects.get')
+    def test_connect_repository(self, mock_social_token):
+        """Test connecting a repository."""
+        # Mock social token
+        mock_token = MagicMock()
+        mock_token.token = 'fake_token'
+        mock_social_token.return_value = mock_token
+        
+        self.client.login(username='testuser', password='testpass')
+        
+        response = self.client.post(self.url, {
+            'repo_id': '123',
+            'repo_name': 'testuser/test-repo',
+            'repo_url': 'https://github.com/testuser/test-repo.git',
+            'repo_description': 'Test repository',
+            'default_branch': 'main'
+        })
+        
+        self.assertEqual(response.status_code, 302)  # Redirect after success
+        
+        # Check that repository was created
+        repo = GitRepository.objects.get(name='testuser/test-repo')
+        self.assertEqual(repo.user, self.user)
+        self.assertEqual(repo.github_id, '123')
+        self.assertEqual(repo.url, 'https://github.com/testuser/test-repo.git')
+    
+    @patch('projects.views.SocialToken.objects.get')
+    def test_connect_duplicate_repository(self, mock_social_token):
+        """Test connecting a repository that already exists."""
+        # Mock social token
+        mock_token = MagicMock()
+        mock_token.token = 'fake_token'
+        mock_social_token.return_value = mock_token
+        
+        # Create existing repository
+        GitRepository.objects.create(
+            name='testuser/test-repo',
+            url='https://github.com/testuser/test-repo.git',
+            user=self.user
+        )
+        
+        self.client.login(username='testuser', password='testpass')
+        
+        response = self.client.post(self.url, {
+            'repo_id': '123',
+            'repo_name': 'testuser/test-repo',
+            'repo_url': 'https://github.com/testuser/test-repo.git',
+            'repo_description': 'Test repository',
+            'default_branch': 'main'
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        # Should only have one repository
+        self.assertEqual(GitRepository.objects.filter(name='testuser/test-repo').count(), 1)

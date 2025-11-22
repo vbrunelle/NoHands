@@ -1,8 +1,11 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from pathlib import Path
 import logging
+from github import Github
+from allauth.socialaccount.models import SocialToken
 
 from .models import GitRepository, Branch, Commit
 from .git_utils import clone_or_update_repo, list_branches, list_commits, GitUtilsError
@@ -15,6 +18,79 @@ def repository_list(request):
     repositories = GitRepository.objects.filter(is_active=True)
     return render(request, 'projects/repository_list.html', {
         'repositories': repositories
+    })
+
+
+@login_required
+def connect_github_repository(request):
+    """Connect a GitHub repository by selecting from user's repositories."""
+    # Get GitHub access token
+    try:
+        social_token = SocialToken.objects.get(
+            account__user=request.user,
+            account__provider='github'
+        )
+        access_token = social_token.token
+    except SocialToken.DoesNotExist:
+        messages.error(request, "Please connect your GitHub account first.")
+        return redirect('repository_list')
+    
+    # Get user's GitHub repositories
+    github_repos = []
+    if request.method == 'GET':
+        try:
+            g = Github(access_token)
+            user = g.get_user()
+            # Limit to first 100 repos for performance (PyGithub handles pagination internally)
+            repos_list = list(user.get_repos()[:100])
+            for repo in repos_list:
+                github_repos.append({
+                    'id': repo.id,
+                    'name': repo.name,
+                    'full_name': repo.full_name,
+                    'description': repo.description or '',
+                    'clone_url': repo.clone_url,
+                    'default_branch': repo.default_branch,
+                    'private': repo.private,
+                })
+        except Exception as e:
+            logger.error(f"Failed to fetch GitHub repositories: {e}")
+            messages.error(request, "Failed to fetch GitHub repositories. Please try again later.")
+    
+    # Connect selected repository
+    if request.method == 'POST':
+        repo_id = request.POST.get('repo_id')
+        repo_name = request.POST.get('repo_name')
+        repo_url = request.POST.get('repo_url')
+        repo_description = request.POST.get('repo_description')
+        default_branch = request.POST.get('default_branch')
+        
+        try:
+            # Check if repository already exists
+            if GitRepository.objects.filter(name=repo_name).exists():
+                messages.warning(request, f"Repository '{repo_name}' is already connected.")
+                return redirect('repository_list')
+            
+            # Create new repository
+            repository = GitRepository.objects.create(
+                name=repo_name,
+                url=repo_url,
+                description=repo_description,
+                default_branch=default_branch,
+                user=request.user,
+                github_id=repo_id,
+                is_active=True
+            )
+            
+            messages.success(request, f"Successfully connected repository '{repo_name}'")
+            return redirect('repository_detail', repo_id=repository.id)
+            
+        except Exception as e:
+            logger.error(f"Failed to connect repository: {e}")
+            messages.error(request, "Failed to connect repository. Please try again.")
+    
+    return render(request, 'projects/connect_github.html', {
+        'github_repos': github_repos
     })
 
 
