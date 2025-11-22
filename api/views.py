@@ -87,6 +87,7 @@ class BuildViewSet(viewsets.ReadOnlyModelViewSet):
             )
             
             # Start build in background
+            # NOTE: For production, use a proper task queue like Celery instead of threading
             thread = threading.Thread(target=execute_build, args=(build.id,))
             thread.daemon = True
             thread.start()

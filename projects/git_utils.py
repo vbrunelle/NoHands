@@ -149,13 +149,21 @@ def checkout_commit(repo_path: Path, sha: str, dest_dir: Path) -> Path:
         # Create destination directory
         dest_dir.mkdir(parents=True, exist_ok=True)
         
-        # Remove existing content if any
+        # Remove existing content if any (with safety check)
         if dest_dir.exists() and any(dest_dir.iterdir()):
-            for item in dest_dir.iterdir():
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
+            # Ensure dest_dir is within a safe base path to prevent accidents
+            try:
+                # Check if it's a subdirectory of expected paths
+                if not str(dest_dir.resolve()).startswith('/tmp/') and not str(dest_dir.resolve()).startswith(str(Path.home())):
+                    raise GitUtilsError(f"Refusing to clean directory outside safe paths: {dest_dir}")
+                
+                for item in dest_dir.iterdir():
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                    else:
+                        item.unlink()
+            except Exception as e:
+                raise GitUtilsError(f"Failed to clean destination directory: {e}")
         
         # Clone repository to destination
         checkout_repo = Repo.clone_from(repo_path, dest_dir)

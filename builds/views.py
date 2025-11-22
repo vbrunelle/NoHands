@@ -48,6 +48,7 @@ def build_create(request, repo_id, commit_id):
         )
         
         # Start build in background thread
+        # NOTE: For production, use a proper task queue like Celery instead of threading
         thread = threading.Thread(target=execute_build, args=(build.id,))
         thread.daemon = True
         thread.start()

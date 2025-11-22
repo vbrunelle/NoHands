@@ -221,7 +221,10 @@ NoHands/
 ### Security
 
 - Never commit sensitive credentials to Git
-- Use environment variables for registry credentials
+- Use environment variables for registry credentials and SECRET_KEY
+- Set `DJANGO_SECRET_KEY` environment variable in production
+- Set `DJANGO_DEBUG=False` in production
+- Set `DJANGO_ALLOWED_HOSTS` to your domain(s) in production
 - Protect admin panel with strong passwords
 - Use HTTPS in production
 - Implement rate limiting for API endpoints
@@ -229,9 +232,30 @@ NoHands/
 ### Performance
 
 - Repositories are cached to avoid repeated clones
-- Builds run in background threads
-- Consider using Celery for production workloads
+- Builds run in background threads (for production, consider using Celery)
+- Consider using Celery or Django-Q for production workloads
 - Clean up old build directories periodically
+
+### Production Deployment
+
+**Important**: The current implementation uses background threads for build execution. For production deployments, consider:
+
+1. **Task Queue**: Use Celery, Django-Q, or similar for reliable background job processing
+2. **Message Broker**: Redis or RabbitMQ for task queue
+3. **Process Manager**: Gunicorn or uWSGI instead of Django dev server
+4. **Database**: PostgreSQL instead of SQLite
+5. **Static Files**: Configure static file serving with WhiteNoise or CDN
+6. **Monitoring**: Add logging, error tracking (Sentry), and monitoring
+
+Example production environment variables:
+```bash
+export DJANGO_SECRET_KEY="your-long-random-secret-key-here"
+export DJANGO_DEBUG=False
+export DJANGO_ALLOWED_HOSTS="yourdomain.com,www.yourdomain.com"
+export DOCKER_REGISTRY="registry.example.com"
+export DOCKER_REGISTRY_USERNAME="your-username"
+export DOCKER_REGISTRY_PASSWORD="your-password"
+```
 
 ### Development
 

@@ -168,9 +168,8 @@ def run_build_sync(
     Use this from Django views.
     """
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
+        # Use asyncio.run() which properly manages the event loop lifecycle
+        result = asyncio.run(
             build_docker_image(
                 source_dir=source_dir,
                 dockerfile_path=dockerfile_path,
@@ -182,7 +181,6 @@ def run_build_sync(
                 registry_password=registry_password,
             )
         )
-        loop.close()
         return result
     except Exception as e:
         error_msg = f"Failed to run build: {str(e)}"
