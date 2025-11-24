@@ -3,7 +3,9 @@ Tests for GitHub OAuth setup and configuration.
 """
 from django.test import TestCase, Client
 from django.contrib.sites.models import Site
+from django.contrib.auth.models import User
 from django.core.management import call_command
+from django.conf import settings
 from allauth.socialaccount.models import SocialApp
 from io import StringIO
 import os
@@ -151,3 +153,143 @@ class GitHubLoginPageTest(TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertContains(response, 'GitHub OAuth Not Configured', status_code=500)
         self.assertContains(response, 'setup_github_oauth', status_code=500)
+
+
+class OAuthCredentialsFormTest(TestCase):
+    """Test cases for the OAuth credentials web form."""
+    
+    def setUp(self):
+        self.client = Client()
+        # Create initial site
+        Site.objects.get_or_create(pk=1, defaults={'domain': 'testserver', 'name': 'Test'})
+        # Clean up any .env file that might exist from previous tests
+        # Use Django's BASE_DIR for robust path resolution
+        self.env_file_path = settings.BASE_DIR / '.env'
+        self.env_backup = None
+        if self.env_file_path.exists():
+            with open(self.env_file_path, 'r') as f:
+                self.env_backup = f.read()
+            os.remove(self.env_file_path)
+    
+    def tearDown(self):
+        # Restore .env file if it existed before tests
+        if self.env_backup is not None:
+            with open(self.env_file_path, 'w') as f:
+                f.write(self.env_backup)
+        elif self.env_file_path.exists():
+            os.remove(self.env_file_path)
+    
+    def _setup_clean_state(self):
+        """Helper method to set up clean test state."""
+        User.objects.all().delete()
+        SocialApp.objects.all().delete()
+    
+    def test_initial_setup_shows_oauth_form_when_not_configured(self):
+        """Test that the initial setup page shows OAuth configuration form when not configured."""
+        self._setup_clean_state()
+        
+        response = self.client.get('/repositories/initial-setup/')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Configure GitHub OAuth')
+        self.assertContains(response, 'client_id')
+        self.assertContains(response, 'client_secret')
+        self.assertContains(response, 'Save Configuration')
+    
+    def test_save_oauth_credentials_creates_social_app(self):
+        """Test that submitting the form creates a SocialApp in the database."""
+        self._setup_clean_state()
+        
+        # POST to the initial-setup endpoint
+        response = self.client.post('/repositories/initial-setup/', {
+            'client_id': 'test_form_client_id',
+            'client_secret': 'test_form_client_secret',
+        }, follow=True)
+        
+        # Should show success
+        self.assertEqual(response.status_code, 200)
+        
+        # Check that OAuth app was created
+        social_app = SocialApp.objects.get(provider='github')
+        self.assertEqual(social_app.client_id, 'test_form_client_id')
+        self.assertEqual(social_app.secret, 'test_form_client_secret')
+    
+    def test_initial_setup_shows_connect_button_when_configured(self):
+        """Test that the initial setup page shows Connect button when OAuth is configured."""
+        # Ensure no users but OAuth is configured
+        User.objects.all().delete()
+        SocialApp.objects.filter(provider='github').delete()
+        
+        site = Site.objects.get(pk=1)
+        social_app = SocialApp.objects.create(
+            provider='github',
+            name='GitHub',
+            client_id='existing_client_id',
+            secret='existing_secret'
+        )
+        social_app.sites.add(site)
+        
+        response = self.client.get('/repositories/initial-setup/')
+        
+        self.assertEqual(response.status_code, 200)
+        # When OAuth is configured, should show Connect button
+        self.assertContains(response, 'Connect with GitHub')
+        # Should NOT show the configuration form
+        self.assertNotContains(response, 'Step 1: Configure GitHub OAuth')
+    
+    def test_initial_setup_shows_existing_env_credentials(self):
+        """Test that credentials from env are shown in the form when not configured."""
+        self._setup_clean_state()
+        
+        # Create .env file with credentials
+        with open(self.env_file_path, 'w') as f:
+            f.write('GITHUB_CLIENT_ID="env_test_client_id"\n')
+            f.write('GITHUB_CLIENT_SECRET="env_test_secret"\n')
+        
+        response = self.client.get('/repositories/initial-setup/')
+        
+        self.assertEqual(response.status_code, 200)
+        # When OAuth is not configured, form should show values from .env
+        self.assertContains(response, 'env_test_client_id')
+    
+    def test_save_oauth_credentials_updates_existing(self):
+        """Test that submitting the form updates an existing SocialApp."""
+        # Create existing OAuth app
+        User.objects.all().delete()
+        SocialApp.objects.filter(provider='github').delete()
+        
+        site = Site.objects.get(pk=1)
+        social_app = SocialApp.objects.create(
+            provider='github',
+            name='GitHub',
+            client_id='old_client_id',
+            secret='old_secret'
+        )
+        social_app.sites.add(site)
+        
+        # POST new credentials
+        response = self.client.post('/repositories/initial-setup/', {
+            'client_id': 'new_client_id',
+            'client_secret': 'new_client_secret',
+        }, follow=True)
+        
+        # Check that OAuth app was updated
+        social_app.refresh_from_db()
+        self.assertEqual(social_app.client_id, 'new_client_id')
+        self.assertEqual(social_app.secret, 'new_client_secret')
+    
+    def test_save_oauth_credentials_requires_both_fields(self):
+        """Test that both client_id and client_secret are required."""
+        self._setup_clean_state()
+        
+        # Test with missing client_secret
+        response = self.client.post('/repositories/initial-setup/', {
+            'client_id': 'test_client_id',
+            'client_secret': '',
+        }, follow=True)
+        
+        # Should show error message
+        self.assertContains(response, 'required')
+        
+        # No OAuth app should be created
+        self.assertFalse(SocialApp.objects.filter(provider='github').exists())

@@ -88,10 +88,12 @@ def write_env_values(client_id, client_secret):
     if not client_secret_found:
         existing_lines.append(f'GITHUB_CLIENT_SECRET="{client_secret}"\n')
     
-    # Write file
+    # Write file with restrictive permissions
     try:
         with open(env_path, 'w') as f:
             f.writelines(existing_lines)
+        # Set restrictive permissions (owner read/write only)
+        os.chmod(env_path, 0o600)
         return True
     except Exception as e:
         logger.error(f"Failed to write .env file: {e}")
