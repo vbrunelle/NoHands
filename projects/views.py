@@ -3,15 +3,136 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.contrib.sites.models import Site
+from django.views.decorators.http import require_http_methods
 from pathlib import Path
 import logging
+import os
 from github import Github
-from allauth.socialaccount.models import SocialToken
+from allauth.socialaccount.models import SocialToken, SocialApp
 
 from .models import GitRepository, Branch, Commit
 from .git_utils import clone_or_update_repo, list_branches, list_commits, GitUtilsError
 
 logger = logging.getLogger(__name__)
+
+
+def get_env_file_path():
+    """Get the path to the .env file in the project root."""
+    return settings.BASE_DIR / '.env'
+
+
+def read_env_values():
+    """
+    Read GitHub OAuth credentials from .env file if it exists.
+    Returns a dict with client_id and client_secret (empty strings if not found).
+    """
+    env_path = get_env_file_path()
+    values = {'client_id': '', 'client_secret': ''}
+    
+    if env_path.exists():
+        try:
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key == 'GITHUB_CLIENT_ID':
+                            values['client_id'] = value
+                        elif key == 'GITHUB_CLIENT_SECRET':
+                            values['client_secret'] = value
+        except Exception as e:
+            logger.warning(f"Failed to read .env file: {e}")
+    
+    # Also check environment variables
+    if not values['client_id']:
+        values['client_id'] = os.environ.get('GITHUB_CLIENT_ID', '')
+    if not values['client_secret']:
+        values['client_secret'] = os.environ.get('GITHUB_CLIENT_SECRET', '')
+    
+    return values
+
+
+def write_env_values(client_id, client_secret):
+    """
+    Write GitHub OAuth credentials to .env file.
+    Creates the file if it doesn't exist, updates existing values if it does.
+    """
+    env_path = get_env_file_path()
+    existing_lines = []
+    client_id_found = False
+    client_secret_found = False
+    
+    # Read existing content
+    if env_path.exists():
+        try:
+            with open(env_path, 'r') as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith('GITHUB_CLIENT_ID='):
+                        existing_lines.append(f'GITHUB_CLIENT_ID="{client_id}"\n')
+                        client_id_found = True
+                    elif stripped.startswith('GITHUB_CLIENT_SECRET='):
+                        existing_lines.append(f'GITHUB_CLIENT_SECRET="{client_secret}"\n')
+                        client_secret_found = True
+                    else:
+                        existing_lines.append(line)
+        except Exception as e:
+            logger.warning(f"Failed to read .env file: {e}")
+    
+    # Add missing values
+    if not client_id_found:
+        existing_lines.append(f'GITHUB_CLIENT_ID="{client_id}"\n')
+    if not client_secret_found:
+        existing_lines.append(f'GITHUB_CLIENT_SECRET="{client_secret}"\n')
+    
+    # Write file
+    try:
+        with open(env_path, 'w') as f:
+            f.writelines(existing_lines)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to write .env file: {e}")
+        return False
+
+
+def setup_github_oauth(client_id, client_secret, site_domain='localhost:8000'):
+    """
+    Configure GitHub OAuth in the database.
+    Returns True on success, False on failure.
+    """
+    try:
+        # Update or create site
+        site, _ = Site.objects.get_or_create(pk=1)
+        site.domain = site_domain
+        site.name = 'NoHands'
+        site.save()
+
+        # Create or update GitHub social app
+        social_app, created = SocialApp.objects.get_or_create(
+            provider='github',
+            defaults={
+                'name': 'GitHub',
+                'client_id': client_id,
+                'secret': client_secret,
+            }
+        )
+
+        if not created:
+            social_app.client_id = client_id
+            social_app.secret = client_secret
+            social_app.save()
+
+        # Associate with site
+        if site not in social_app.sites.all():
+            social_app.sites.add(site)
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to setup GitHub OAuth: {e}")
+        return False
 
 
 def initial_setup(request):
@@ -20,6 +141,7 @@ def initial_setup(request):
     
     This page is displayed when no users exist in the system.
     The user must connect via GitHub OAuth to create the first admin account.
+    Allows administrators to configure OAuth credentials directly from this page.
     """
     # Check if users already exist
     has_users = User.objects.exists()
@@ -28,7 +150,53 @@ def initial_setup(request):
         # If users exist, redirect to the main page
         return redirect('repository_list')
     
-    return render(request, 'projects/initial_setup.html')
+    # Check if OAuth is already configured
+    oauth_configured = SocialApp.objects.filter(provider='github').exists()
+    
+    # Read default values from .env file or environment
+    env_values = read_env_values()
+    
+    error_message = None
+    success_message = None
+    
+    if request.method == 'POST':
+        # Handle form submission
+        client_id = request.POST.get('client_id', '').strip()
+        client_secret = request.POST.get('client_secret', '').strip()
+        save_to_env = request.POST.get('save_to_env') == 'on'
+        
+        if not client_id or not client_secret:
+            error_message = "Both Client ID and Client Secret are required."
+        else:
+            # Save to database
+            db_success = setup_github_oauth(client_id, client_secret)
+            
+            # Save to .env file if requested
+            env_success = True
+            if save_to_env:
+                env_success = write_env_values(client_id, client_secret)
+            
+            if db_success:
+                success_message = "GitHub OAuth configured successfully! You can now connect with GitHub."
+                oauth_configured = True
+                # Update env_values for display
+                env_values['client_id'] = client_id
+                env_values['client_secret'] = client_secret
+            else:
+                error_message = "Failed to save OAuth configuration to database. Please try again."
+            
+            if save_to_env and not env_success:
+                if success_message:
+                    success_message += " (Note: Could not save to .env file)"
+                else:
+                    error_message = "Failed to save to .env file."
+    
+    return render(request, 'projects/initial_setup.html', {
+        'oauth_configured': oauth_configured,
+        'env_values': env_values,
+        'error_message': error_message,
+        'success_message': success_message,
+    })
 
 
 @login_required
