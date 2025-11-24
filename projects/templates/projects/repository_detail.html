@@ -67,15 +67,6 @@
                     <i class="ti ti-git-branch icon me-2"></i>
                     Branches
                 </h3>
-                <div class="card-actions">
-                    <form method="post" class="d-inline">
-                        {% csrf_token %}
-                        <button type="submit" name="refresh_branches" class="btn btn-primary btn-sm">
-                            <i class="ti ti-refresh icon"></i>
-                            Refresh Branches
-                        </button>
-                    </form>
-                </div>
             </div>
             {% if branches %}
             <div class="table-responsive">
@@ -116,7 +107,7 @@
                     </div>
                     <p class="empty-title">No branches found</p>
                     <p class="empty-subtitle text-muted">
-                        Click "Refresh Branches" to fetch from repository
+                        Branches are automatically loaded when available
                     </p>
                 </div>
             </div>

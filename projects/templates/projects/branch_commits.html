@@ -17,15 +17,6 @@
                 {{ repository.name }} / {{ branch.name }}
             </h2>
         </div>
-        <div class="col-auto ms-auto d-print-none">
-            <form method="post" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" name="refresh_commits" class="btn btn-primary">
-                    <i class="ti ti-refresh icon"></i>
-                    Refresh Commits
-                </button>
-            </form>
-        </div>
     </div>
 </div>
 
@@ -92,17 +83,8 @@
                     </div>
                     <p class="empty-title">No commits found</p>
                     <p class="empty-subtitle text-muted">
-                        Click "Refresh Commits" to fetch from repository
+                        Commits are automatically loaded when available
                     </p>
-                    <div class="empty-action">
-                        <form method="post">
-                            {% csrf_token %}
-                            <button type="submit" name="refresh_commits" class="btn btn-primary">
-                                <i class="ti ti-refresh icon"></i>
-                                Refresh Commits
-                            </button>
-                        </form>
-                    </div>
                 </div>
             </div>
             {% endif %}
