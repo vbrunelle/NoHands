@@ -189,5 +189,9 @@ SOCIALACCOUNT_PROVIDERS = {
             'user',
             'repo',
         ],
+        'TOKEN_STRATEGY': 'allauth.socialaccount.providers.oauth2.client.STORE',
     }
 }
+
+# Store OAuth tokens so we can use them to access GitHub API
+SOCIALACCOUNT_STORE_TOKENS = True
