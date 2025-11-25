@@ -9,6 +9,7 @@ import logging
 import threading
 import os
 import requests
+import re
 
 from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE, get_dockerfile_templates, get_default_template
 from projects.models import GitRepository, Commit
@@ -475,18 +476,77 @@ def proxy_to_container(request, build_id, path=''):
         else:
             return HttpResponse(f"Method {request.method} not supported", status=405)
         
-        # Create response
-        response = StreamingHttpResponse(
-            resp.iter_content(chunk_size=8192),
-            status=resp.status_code,
-            content_type=resp.headers.get('content-type', 'text/html')
-        )
+        # Get content type
+        content_type = resp.headers.get('content-type', '')
+        
+        # For HTML responses, rewrite URLs to use proxy path
+        if 'text/html' in content_type:
+            # Read full content for URL rewriting
+            content = resp.content.decode('utf-8', errors='replace')
+            
+            # Proxy base path
+            proxy_base = f"/builds/{build_id}/fwd"
+            
+            # Rewrite absolute URLs that point to localhost or container
+            # Pattern 1: http://localhost:PORT/path -> /builds/ID/fwd/path
+            content = re.sub(
+                rf'https?://localhost:{build.host_port}(/[^"\'\s]*)',
+                rf'{proxy_base}\1',
+                content
+            )
+            content = re.sub(
+                rf'https?://127\.0\.0\.1:{build.host_port}(/[^"\'\s]*)',
+                rf'{proxy_base}\1',
+                content
+            )
+            
+            # Pattern 2: Relative URLs starting with / -> /builds/ID/fwd/
+            # This handles href="/path" or src="/static/file.js"
+            content = re.sub(
+                r'(href|src|action)="(/[^"]*)"',
+                rf'\1="{proxy_base}\2"',
+                content
+            )
+            content = re.sub(
+                r"(href|src|action)='(/[^']*)'",
+                rf"\1='{proxy_base}\2'",
+                content
+            )
+            
+            # Rewrite Location header for redirects
+            response = HttpResponse(content, status=resp.status_code, content_type=content_type)
+        else:
+            # For non-HTML content, stream as before
+            response = StreamingHttpResponse(
+                resp.iter_content(chunk_size=8192),
+                status=resp.status_code,
+                content_type=content_type
+            )
         
         # Copy response headers
-        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
+        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'location']
         for key, value in resp.headers.items():
             if key.lower() not in excluded_headers:
                 response[key] = value
+        
+        # Rewrite Location header for redirects
+        if 'location' in resp.headers:
+            location = resp.headers['location']
+            # Rewrite absolute URLs in redirects
+            location = re.sub(
+                rf'https?://localhost:{build.host_port}(/.*)',
+                rf'{proxy_base}\1',
+                location
+            )
+            location = re.sub(
+                rf'https?://127\.0\.0\.1:{build.host_port}(/.*)',
+                rf'{proxy_base}\1',
+                location
+            )
+            # Rewrite relative redirects
+            if location.startswith('/'):
+                location = f'{proxy_base}{location}'
+            response['Location'] = location
         
         return response
         
