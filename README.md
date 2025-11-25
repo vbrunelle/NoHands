@@ -22,6 +22,7 @@
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Docker Deployment](#-docker-deployment)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Usage Examples](#usage-examples)
@@ -242,6 +243,127 @@ Open your browser and navigate to:
 - **API Root**: http://localhost:8000/api/
 
 Log in with the superuser credentials you created.
+
+## 🐳 Docker Deployment
+
+NoHands can be deployed using Docker for easy containerization and deployment.
+
+### Quick Start with Docker
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t nohands .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -p 8000:8000 nohands
+   ```
+
+3. **Access the application:**
+   - Web Interface: http://localhost:8000/
+   - Admin Panel: http://localhost:8000/admin/
+   - API Root: http://localhost:8000/api/
+
+### Docker with Environment Variables
+
+For production-like deployments, configure environment variables:
+
+```bash
+docker run -p 8000:8000 \
+  -e DJANGO_SECRET_KEY="your-long-random-secret-key-minimum-50-characters" \
+  -e DJANGO_DEBUG=False \
+  -e DJANGO_ALLOWED_HOSTS="yourdomain.com,localhost" \
+  -e GITHUB_CLIENT_ID="your_github_client_id" \
+  -e GITHUB_CLIENT_SECRET="your_github_client_secret" \
+  nohands
+```
+
+### Docker with Persistent Data
+
+To persist data (database and Git checkouts) between container restarts:
+
+```bash
+docker run -p 8000:8000 \
+  -v nohands_data:/app/db.sqlite3 \
+  -v nohands_tmp:/app/tmp \
+  -e DJANGO_SECRET_KEY="your-secret-key" \
+  nohands
+```
+
+### Docker with Docker Socket (for Dagger builds)
+
+To enable Dagger builds from within the container, mount the Docker socket:
+
+```bash
+docker run -p 8000:8000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e DJANGO_SECRET_KEY="your-secret-key" \
+  nohands
+```
+
+### Docker Compose Example
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+
+services:
+  nohands:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SECRET_KEY=your-long-random-secret-key-here
+      - DJANGO_DEBUG=False
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+    volumes:
+      - nohands_data:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  nohands_data:
+```
+
+Run with:
+```bash
+docker-compose up -d
+```
+
+### Available Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DJANGO_SECRET_KEY` | Secret key for Django (required in production) | Development key |
+| `DJANGO_DEBUG` | Enable debug mode | `True` |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated allowed hosts | Empty |
+| `DOCKER_REGISTRY` | Docker registry URL | Empty |
+| `DOCKER_REGISTRY_USERNAME` | Registry username | Empty |
+| `DOCKER_REGISTRY_PASSWORD` | Registry password | Empty |
+| `GITHUB_CLIENT_ID` | GitHub OAuth Client ID | Empty |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth Client Secret | Empty |
+| `MAX_CONCURRENT_BUILDS` | Maximum concurrent builds | `1` |
+
+### Production Recommendations
+
+For production Docker deployments:
+
+1. **Use a production WSGI server**: Replace the development server with Gunicorn:
+   ```dockerfile
+   # In your custom Dockerfile
+   RUN pip install gunicorn
+   CMD ["gunicorn", "nohands_project.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+   ```
+
+2. **Use PostgreSQL**: Configure a PostgreSQL database instead of SQLite.
+
+3. **Set up a reverse proxy**: Use Nginx or Traefik in front of the application.
+
+4. **Enable HTTPS**: Configure SSL/TLS certificates.
+
+5. **Set proper secrets**: Always use strong, unique secret keys in production.
 
 ## 🎯 Quick Start
 
