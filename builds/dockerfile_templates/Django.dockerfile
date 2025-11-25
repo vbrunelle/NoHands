@@ -26,5 +26,6 @@ RUN python manage.py collectstatic --noinput || true
 # Expose the application port
 EXPOSE 8000
 
-# Run with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "config.wsgi:application"]
+# Run Django development server
+# For production, consider using: gunicorn --bind 0.0.0.0:8000 --workers 2 yourproject.wsgi:application
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
