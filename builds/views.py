@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
+from http.cookies import SimpleCookie
 from pathlib import Path
 import logging
 import threading
@@ -462,7 +463,9 @@ def proxy_to_container(request, build_id, path=''):
         # Django checks that Origin/Referer match the Host
         headers['Host'] = f"127.0.0.1:{build.host_port}"
         if request.method == 'POST':
-            headers['Referer'] = f"http://127.0.0.1:{build.host_port}/"
+            # Set Referer to point to the same page on the container
+            # This is required for Django CSRF validation
+            headers['Referer'] = f"http://127.0.0.1:{build.host_port}/{path}"
             headers['Origin'] = f"http://127.0.0.1:{build.host_port}"
         
         # Extract and forward only non-NoHands cookies to the container
@@ -475,11 +478,19 @@ def proxy_to_container(request, build_id, path=''):
             ]
             if filtered_cookies:
                 headers['Cookie'] = '; '.join(filtered_cookies)
+                logger.debug(f"Forwarding cookies to container: {headers['Cookie']}")
+            else:
+                logger.debug("No cookies to forward to container")
+        else:
+            logger.debug("No Cookie header in request")
         
         # Make the request to the container
         if request.method == 'GET':
             resp = requests.get(target_url, headers=headers, stream=True, timeout=30)
         elif request.method == 'POST':
+            logger.info(f"POST to container: {target_url}")
+            logger.info(f"Headers: Host={headers.get('Host')}, Referer={headers.get('Referer')}, Origin={headers.get('Origin')}")
+            logger.info(f"Cookies: {headers.get('Cookie', 'None')}")
             resp = requests.post(
                 target_url,
                 data=request.body,
@@ -561,15 +572,38 @@ def proxy_to_container(request, build_id, path=''):
                 response[key] = value
         
         # Handle Set-Cookie headers - need to adjust path for proxy
-        if 'set-cookie' in resp.headers:
-            cookies = resp.headers.get('set-cookie', '').split(',')
-            for cookie in cookies:
-                # Rewrite cookie path to be scoped to the proxy path
-                if 'Path=/' in cookie:
-                    cookie = cookie.replace('Path=/', f'Path=/builds/{build_id}/fwd/')
-                elif 'path=/' in cookie:
-                    cookie = cookie.replace('path=/', f'path=/builds/{build_id}/fwd/')
-                response['Set-Cookie'] = cookie
+        # Parse and rewrite all Set-Cookie headers
+        if hasattr(resp, 'cookies') and resp.cookies:
+            logger.info(f"Processing {len(resp.cookies)} cookies from container")
+            for cookie in resp.cookies:
+                logger.info(f"Setting cookie: {cookie.name}={cookie.value[:20]}... with Path=/builds/{build_id}/fwd/")
+                # Set the cookie with the modified path
+                kwargs = {
+                    'key': cookie.name,
+                    'value': cookie.value,
+                    'path': f'/builds/{build_id}/fwd/',
+                }
+                
+                # Add optional attributes only if they exist and are not None
+                # Note: We don't set domain to let the browser use the current domain
+                if cookie.expires:
+                    kwargs['expires'] = cookie.expires
+                # Skip domain to avoid cross-domain issues
+                # if cookie.domain and cookie.domain != '':
+                #     kwargs['domain'] = cookie.domain
+                if cookie.secure:
+                    kwargs['secure'] = True
+                
+                # Check for additional attributes that might be in _rest
+                if hasattr(cookie, '_rest'):
+                    if 'HttpOnly' in cookie._rest:
+                        kwargs['httponly'] = True
+                    if 'SameSite' in cookie._rest:
+                        kwargs['samesite'] = cookie._rest['SameSite']
+                
+                response.set_cookie(**kwargs)
+        else:
+            logger.info("No cookies from container response")
         
         # Rewrite Location header for redirects
         if 'location' in resp.headers:
