@@ -109,50 +109,11 @@ async def build_docker_image(
                 ref = await container.publish(full_image_tag)
                 logs.append(f"Successfully pushed image: {ref}")
             else:
-                # Export to local Docker daemon
-                logs.append("Exporting image to local Docker daemon")
+                # Just build without pushing
+                logs.append("Building image without pushing to registry")
+                ref = await container.export(str(source_dir / f"{image_name}_{image_tag}.tar"))
+                logs.append(f"Image built and exported to: {ref}")
                 full_image_tag = f"{image_name}:{image_tag}"
-                
-                # Export as tar and load into Docker
-                tar_path = source_dir / f"{image_name}_{image_tag}.tar"
-                await container.export(str(tar_path))
-                logs.append(f"Image exported to: {tar_path}")
-                
-                # Load the tar into Docker daemon
-                import subprocess
-                result = subprocess.run(
-                    ['docker', 'load', '-i', str(tar_path)],
-                    capture_output=True,
-                    text=True
-                )
-                
-                if result.returncode == 0:
-                    logs.append(f"Image loaded into Docker: {full_image_tag}")
-                    logs.append(f"Docker output: {result.stdout.strip()}")
-                    
-                    # Extract the image ID from docker load output
-                    # Format: "Loaded image ID: sha256:..."
-                    output = result.stdout.strip()
-                    if 'sha256:' in output:
-                        image_id = output.split('sha256:')[1].strip()
-                        # Tag the image with our desired name
-                        tag_result = subprocess.run(
-                            ['docker', 'tag', f'sha256:{image_id}', full_image_tag],
-                            capture_output=True
-                        )
-                        if tag_result.returncode == 0:
-                            logs.append(f"Successfully tagged image as {full_image_tag}")
-                        else:
-                            logs.append(f"Warning: Failed to tag image: {tag_result.stderr}")
-                else:
-                    logs.append(f"Warning: Failed to load into Docker: {result.stderr}")
-                
-                # Cleanup tar file
-                try:
-                    tar_path.unlink()
-                    logs.append("Cleaned up tar file")
-                except:
-                    pass
             
             duration = (datetime.now() - start_time).total_seconds()
             logs.append(f"Build completed successfully in {duration:.2f} seconds")
