@@ -18,6 +18,10 @@ def find_available_port(start_port: int = 8000, max_attempts: int = 100) -> int:
     """
     Find an available port on the host.
     
+    Note: There's an inherent race condition between checking port availability
+    and actually binding to it. The start_container function implements retry
+    logic to handle this case.
+    
     Args:
         start_port: Starting port number to check
         max_attempts: Maximum number of ports to try
@@ -43,6 +47,7 @@ def start_container(
     container_port: int,
     host_port: Optional[int] = None,
     container_name: Optional[str] = None,
+    max_retries: int = 3,
 ) -> Tuple[str, int]:
     """
     Start a Docker container from the given image.
@@ -52,46 +57,60 @@ def start_container(
         container_port: Port to expose from the container
         host_port: Host port to map to (if None, an available port will be found)
         container_name: Optional name for the container
+        max_retries: Maximum number of retry attempts if port is taken
         
     Returns:
         Tuple of (container_id, host_port)
         
     Raises:
-        DockerError: If container fails to start
+        DockerError: If container fails to start after all retries
     """
-    if host_port is None:
-        host_port = find_available_port()
+    last_error = None
     
-    cmd = [
-        'docker', 'run',
-        '-d',  # Detached mode
-        '-p', f'{host_port}:{container_port}',
-    ]
+    for attempt in range(max_retries):
+        try:
+            current_port = host_port if host_port is not None else find_available_port()
+            
+            cmd = [
+                'docker', 'run',
+                '-d',  # Detached mode
+                '-p', f'{current_port}:{container_port}',
+            ]
+            
+            if container_name:
+                # Add attempt number to avoid name conflicts on retry
+                name = container_name if attempt == 0 else f"{container_name}-{attempt}"
+                cmd.extend(['--name', name])
+            
+            cmd.append(image_tag)
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if result.returncode != 0:
+                # Check if it's a port conflict error
+                if 'port is already allocated' in result.stderr.lower() or 'bind' in result.stderr.lower():
+                    last_error = DockerError(f"Port {current_port} is already in use")
+                    continue
+                raise DockerError(f"Failed to start container: {result.stderr}")
+            
+            container_id = result.stdout.strip()
+            logger.info(f"Started container {container_id[:12]} on port {current_port}")
+            return container_id, current_port
+            
+        except subprocess.TimeoutExpired:
+            raise DockerError("Timeout while starting container")
+        except FileNotFoundError:
+            raise DockerError("Docker command not found. Is Docker installed?")
     
-    if container_name:
-        cmd.extend(['--name', container_name])
-    
-    cmd.append(image_tag)
-    
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        
-        if result.returncode != 0:
-            raise DockerError(f"Failed to start container: {result.stderr}")
-        
-        container_id = result.stdout.strip()
-        logger.info(f"Started container {container_id[:12]} on port {host_port}")
-        return container_id, host_port
-        
-    except subprocess.TimeoutExpired:
-        raise DockerError("Timeout while starting container")
-    except FileNotFoundError:
-        raise DockerError("Docker command not found. Is Docker installed?")
+    # All retries exhausted
+    if last_error:
+        raise last_error
+    raise DockerError("Failed to start container after multiple attempts")
 
 
 def stop_container(container_id: str) -> bool:
@@ -180,7 +199,8 @@ def get_container_logs(container_id: str, tail: Optional[int] = None) -> str:
     Raises:
         DockerError: If logs cannot be retrieved
     """
-    cmd = ['docker', 'logs']
+    # Use --timestamps to help order the logs when combining stdout/stderr
+    cmd = ['docker', 'logs', '--timestamps']
     if tail is not None:
         cmd.extend(['--tail', str(tail)])
     cmd.append(container_id)
@@ -196,8 +216,16 @@ def get_container_logs(container_id: str, tail: Optional[int] = None) -> str:
         if result.returncode != 0:
             raise DockerError(f"Failed to get container logs: {result.stderr}")
         
-        # Combine stdout and stderr (Docker logs can be in either)
-        return result.stdout + result.stderr
+        # Docker logs writes stdout and stderr separately
+        # When timestamps are enabled, we can sort them for proper ordering
+        stdout_lines = result.stdout.splitlines() if result.stdout else []
+        stderr_lines = result.stderr.splitlines() if result.stderr else []
+        
+        # Combine and sort by timestamp (timestamps are ISO format at start of each line)
+        all_lines = stdout_lines + stderr_lines
+        all_lines.sort()
+        
+        return '\n'.join(all_lines)
         
     except subprocess.TimeoutExpired:
         raise DockerError("Timeout while getting container logs")

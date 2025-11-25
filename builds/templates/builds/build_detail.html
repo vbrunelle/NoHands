@@ -258,9 +258,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="logs" id="container-logs" style="max-height: 400px; overflow-y: auto;">
-                    <span class="text-muted">Loading logs...</span>
-                </div>
+                <pre class="logs" id="container-logs" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; margin: 0;">Loading logs...</pre>
             </div>
         </div>
     </div>
@@ -334,12 +332,16 @@
         fetch('{% url "container_logs" build.id %}?tail=200')
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.logs) {
-                    logsContainer.textContent = data.logs;
+                if (data.success) {
+                    if (data.logs) {
+                        logsContainer.textContent = data.logs;
+                    } else {
+                        logsContainer.textContent = 'No logs available yet...';
+                    }
                     // Auto-scroll to bottom
                     logsContainer.scrollTop = logsContainer.scrollHeight;
-                } else if (!data.success) {
-                    logsContainer.innerHTML = '<span class="text-muted">' + (data.error || 'Failed to load logs') + '</span>';
+                } else {
+                    logsContainer.textContent = data.error || 'Failed to load logs';
                     // Stop auto-refresh if container is not running
                     if (refreshInterval) {
                         clearInterval(refreshInterval);

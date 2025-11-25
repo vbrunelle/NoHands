@@ -21,6 +21,26 @@ from .docker_utils import (
 logger = logging.getLogger(__name__)
 
 
+def _validate_container_port(port_value, default=8080):
+    """
+    Validate and return a container port value.
+    
+    Args:
+        port_value: The port value to validate (can be string or int)
+        default: Default port to return if validation fails
+        
+    Returns:
+        A valid port number between 1 and 65535
+    """
+    try:
+        port = int(port_value) if port_value else default
+        if port < 1 or port > 65535:
+            return default
+        return port
+    except (ValueError, TypeError):
+        return default
+
+
 @login_required
 def build_list(request):
     """List all builds."""
@@ -47,14 +67,7 @@ def build_create(request, repo_id, commit_id):
     
     if request.method == 'POST':
         push_to_registry = request.POST.get('push_to_registry') == 'on'
-        container_port = request.POST.get('container_port', 8080)
-        
-        try:
-            container_port = int(container_port)
-            if container_port < 1 or container_port > 65535:
-                container_port = 8080
-        except (ValueError, TypeError):
-            container_port = 8080
+        container_port = _validate_container_port(request.POST.get('container_port', 8080))
         
         # Create build record
         build = Build.objects.create(
