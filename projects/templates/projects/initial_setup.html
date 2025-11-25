@@ -4,17 +4,17 @@
 
 {% block content %}
 <div class="page-center">
-    <div class="container container-tight py-4">
+    <div class="container container-normal py-4">
         <div class="text-center mb-4">
             <a href="." class="navbar-brand navbar-brand-autodark">
                 <i class="ti ti-rocket me-2" style="font-size: 3rem;"></i>
             </a>
         </div>
-        <div class="card card-md">
+        <div class="card card-lg">
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Welcome to NoHands!</h2>
                 <p class="text-muted text-center mb-4">
-                    This is your first time accessing NoHands. To get started, you need to connect your GitHub account.
+                    This is your first time accessing NoHands. Follow the steps below to configure GitHub authentication and get started.
                 </p>
                 
                 {% if error_message %}
@@ -39,7 +39,7 @@
                 </div>
                 {% endif %}
                 
-                <div class="alert alert-info" role="alert">
+                <div class="alert alert-info mb-4" role="alert">
                     <div class="d-flex">
                         <div>
                             <i class="ti ti-info-circle alert-icon"></i>
@@ -54,51 +54,136 @@
                     </div>
                 </div>
 
-                {% if not oauth_configured %}
-                <!-- OAuth Configuration Section -->
-                <div class="mb-4">
-                    <div class="card bg-light">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="ti ti-settings me-2"></i>
-                                Step 1: Configure GitHub OAuth
-                            </h3>
+                <!-- Detected URL Info -->
+                <div class="alert alert-secondary mb-4" role="alert">
+                    <div class="d-flex">
+                        <div>
+                            <i class="ti ti-world alert-icon"></i>
                         </div>
-                        <div class="card-body">
-                            <p class="text-muted mb-3">
-                                Before you can connect with GitHub, you need to set up an OAuth application.
-                                <a href="https://github.com/settings/developers" target="_blank" class="text-primary">
-                                    Create one on GitHub <i class="ti ti-external-link"></i>
-                                </a>
-                            </p>
-                            
-                            <div class="alert alert-secondary mb-3">
-                                <strong>Callback URL to use:</strong><br>
-                                <code>http://localhost:8000/accounts/github/login/callback/</code>
+                        <div>
+                            <h4 class="alert-title">Detected Application URL</h4>
+                            <div class="text-muted">
+                                Your application is accessible at: <strong>{{ detected_app_url }}</strong>
                             </div>
-                            
+                        </div>
+                    </div>
+                </div>
+
+                {% if not oauth_configured %}
+                <!-- Step-by-Step OAuth Configuration -->
+                <div class="mb-4">
+                    <h3 class="mb-3">
+                        <span class="badge bg-primary me-2">Step 1</span>
+                        Create a GitHub OAuth Application
+                    </h3>
+                    
+                    <ol class="list-group list-group-numbered mb-4">
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Go to GitHub Developer Settings</div>
+                                <a href="https://github.com/settings/developers" target="_blank" class="text-primary">
+                                    https://github.com/settings/developers <i class="ti ti-external-link"></i>
+                                </a>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Click "New OAuth App"</div>
+                                <span class="text-muted">You'll find this button under "OAuth Apps" section</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold mb-2">Fill in the application details:</div>
+                                
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small" id="app_name_label">Application name</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control bg-light" id="app_name" value="NoHands" readonly aria-labelledby="app_name_label">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('app_name')" title="Copy application name to clipboard" aria-label="Copy application name to clipboard">
+                                                <i class="ti ti-copy" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small" id="homepage_url_label">Homepage URL</label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control bg-light" id="homepage_url" value="{{ detected_app_url }}" readonly aria-labelledby="homepage_url_label">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('homepage_url')" title="Copy homepage URL to clipboard" aria-label="Copy homepage URL to clipboard">
+                                                <i class="ti ti-copy" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small" id="callback_url_label">Authorization callback URL <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control bg-light" id="callback_url" value="{{ callback_url }}" readonly aria-labelledby="callback_url_label">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('callback_url')" title="Copy callback URL to clipboard" aria-label="Copy callback URL to clipboard">
+                                                <i class="ti ti-copy" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                        <div class="form-hint text-danger">
+                                            <i class="ti ti-alert-triangle"></i> This URL must match exactly! Make sure you access NoHands using the same URL.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Click "Register application"</div>
+                                <span class="text-muted">This will create your OAuth application</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Copy your Client ID</div>
+                                <span class="text-muted">You'll see this on the application page after registration</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Generate and copy Client Secret</div>
+                                <span class="text-muted">Click "Generate a new client secret" and copy it immediately (it won't be shown again)</span>
+                            </div>
+                        </li>
+                    </ol>
+                    
+                    <h3 class="mb-3">
+                        <span class="badge bg-primary me-2">Step 2</span>
+                        Enter Your OAuth Credentials
+                    </h3>
+                    
+                    <div class="card bg-light">
+                        <div class="card-body">
                             <form method="post" action="">
                                 {% csrf_token %}
                                 <div class="mb-3">
                                     <label class="form-label required" for="client_id">GitHub Client ID</label>
                                     <input type="text" class="form-control" id="client_id" name="client_id" 
-                                           value="{{ env_values.client_id }}" placeholder="Enter your GitHub OAuth Client ID"
-                                           required>
-                                    <span class="form-hint">Found in your GitHub OAuth App settings</span>
+                                           value="{{ env_values.client_id }}" placeholder="Paste your GitHub OAuth Client ID here"
+                                           required autocomplete="off">
+                                    <span class="form-hint">Found on your GitHub OAuth App page</span>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label required" for="client_secret">GitHub Client Secret</label>
                                     <input type="password" class="form-control" id="client_secret" name="client_secret" 
-                                           value="{{ env_values.client_secret }}" placeholder="Enter your GitHub OAuth Client Secret"
-                                           required>
-                                    <span class="form-hint">Generate this in your GitHub OAuth App settings</span>
+                                           value="{{ env_values.client_secret }}" placeholder="Paste your GitHub OAuth Client Secret here"
+                                           required autocomplete="new-password">
+                                    <span class="form-hint">Generated from your GitHub OAuth App page</span>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-check">
                                         <input type="checkbox" class="form-check-input" name="save_to_env" checked>
-                                        <span class="form-check-label">Save to .env file for persistence</span>
+                                        <span class="form-check-label">Save credentials to .env file</span>
                                     </label>
-                                    <span class="form-hint">Saves credentials so they persist across server restarts</span>
+                                    <span class="form-hint">
+                                        Recommended: Saves credentials so they persist across server restarts. 
+                                        Also saves the application URL ({{ detected_app_url }}).
+                                    </span>
                                 </div>
                                 <div class="form-footer">
                                     <button type="submit" class="btn btn-primary w-100">
@@ -110,48 +195,70 @@
                         </div>
                     </div>
                 </div>
-                {% endif %}
-
-                {% if oauth_configured %}
-                <!-- Connection Section (only shown when OAuth is configured) -->
+                {% else %}
+                <!-- OAuth Configured - Show Step 3 -->
                 <div class="mb-4">
-                    <h3 class="h4 mb-3">What you can do after connecting:</h3>
-                    <ul class="list-unstyled space-y-1">
+                    <div class="alert alert-success" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <i class="ti ti-check alert-icon"></i>
+                            </div>
+                            <div>
+                                <h4 class="alert-title">GitHub OAuth Configured!</h4>
+                                <div class="text-muted">
+                                    Your GitHub OAuth application is set up and ready to use.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h3 class="mb-3">
+                        <span class="badge bg-success me-2">Step 3</span>
+                        Connect Your GitHub Account
+                    </h3>
+                    
+                    <p class="text-muted mb-4">
+                        Click the button below to authenticate with GitHub. This will:
+                    </p>
+                    
+                    <ul class="list-unstyled space-y-2 mb-4">
                         <li class="d-flex align-items-center">
                             <i class="ti ti-check text-success me-2"></i>
-                            <span>Browse and connect your GitHub repositories</span>
+                            <span>Create your admin account on NoHands</span>
                         </li>
                         <li class="d-flex align-items-center">
                             <i class="ti ti-check text-success me-2"></i>
-                            <span>Trigger Docker image builds from any commit</span>
+                            <span>Allow you to browse and connect your GitHub repositories</span>
                         </li>
                         <li class="d-flex align-items-center">
                             <i class="ti ti-check text-success me-2"></i>
-                            <span>Monitor build status and view logs</span>
+                            <span>Enable Docker image builds from any commit</span>
                         </li>
                         <li class="d-flex align-items-center">
                             <i class="ti ti-check text-success me-2"></i>
-                            <span>Access the admin interface</span>
+                            <span>Grant access to the admin interface</span>
                         </li>
                         <li class="d-flex align-items-center">
                             <i class="ti ti-check text-success me-2"></i>
-                            <span>Use the REST API for automation</span>
+                            <span>Enable the REST API for automation</span>
                         </li>
                     </ul>
-                </div>
 
-                <div class="form-footer text-center">
-                    <a href="/accounts/github/login/?process=login" class="btn btn-primary w-100 btn-lg">
-                        <i class="ti ti-brand-github me-2"></i>
-                        Connect with GitHub
-                    </a>
+                    <div class="form-footer text-center">
+                        <a href="/accounts/github/login/?process=login" class="btn btn-primary w-100 btn-lg">
+                            <i class="ti ti-brand-github me-2"></i>
+                            Connect with GitHub
+                        </a>
+                    </div>
                 </div>
-                {% else %}
+                {% endif %}
+
+                {% if not oauth_configured %}
                 <!-- Show disabled button when OAuth is not configured -->
                 <div class="form-footer text-center mt-4">
                     <button class="btn btn-secondary w-100 btn-lg" disabled>
                         <i class="ti ti-brand-github me-2"></i>
-                        Connect with GitHub (Configure OAuth first)
+                        Connect with GitHub (Complete Step 2 first)
                     </button>
                 </div>
                 {% endif %}
@@ -160,9 +267,14 @@
                 
                 <div class="text-center text-muted mt-3">
                     <small>
-                        Advanced users can also create an admin account using:<br>
-                        <code>python manage.py createsuperuser</code>
+                        Advanced users can also create an admin account using:
                     </small>
+                    <div class="input-group input-group-sm mt-2 mx-auto" style="max-width: 400px;">
+                        <input type="text" class="form-control bg-light text-center font-monospace" id="cmd_superuser" value="python manage.py createsuperuser" readonly aria-label="Django superuser command">
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('cmd_superuser')" title="Copy command to clipboard" aria-label="Copy superuser command to clipboard">
+                            <i class="ti ti-copy" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -174,4 +286,32 @@
         </div>
     </div>
 </div>
+
+<script>
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    const text = element.value;
+    
+    navigator.clipboard.writeText(text).then(function() {
+        // Show success feedback
+        const button = element.nextElementSibling;
+        const originalIcon = button.innerHTML;
+        button.innerHTML = '<i class="ti ti-check text-success"></i>';
+        button.classList.add('btn-success');
+        button.classList.remove('btn-outline-secondary');
+        
+        setTimeout(function() {
+            button.innerHTML = originalIcon;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Failed to copy text: ', err);
+        // Fallback for older browsers
+        element.select();
+        element.setSelectionRange(0, 99999);
+        document.execCommand('copy');
+    });
+}
+</script>
 {% endblock %}

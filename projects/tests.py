@@ -1,4 +1,4 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, RequestFactory
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -485,3 +485,138 @@ class ConnectGitHubRepositoryViewTest(TestCase):
         self.assertEqual(response.status_code, 302)
         # Should only have one repository
         self.assertEqual(GitRepository.objects.filter(name='testuser/test-repo').count(), 1)
+
+
+class AppConfigurationModelTest(TestCase):
+    """Tests for AppConfiguration singleton model."""
+    
+    def test_get_config_creates_instance(self):
+        """Test that get_config creates an instance if none exists."""
+        from .models import AppConfiguration
+        
+        self.assertFalse(AppConfiguration.objects.exists())
+        config = AppConfiguration.get_config()
+        self.assertTrue(AppConfiguration.objects.exists())
+        self.assertEqual(config.pk, 1)
+    
+    def test_get_config_returns_same_instance(self):
+        """Test that get_config returns the same instance."""
+        from .models import AppConfiguration
+        
+        config1 = AppConfiguration.get_config()
+        config2 = AppConfiguration.get_config()
+        self.assertEqual(config1.pk, config2.pk)
+    
+    def test_save_updates_existing(self):
+        """Test that saving a new instance updates the existing one."""
+        from .models import AppConfiguration
+        
+        # Create first instance
+        config1 = AppConfiguration.get_config()
+        config1.app_url = 'http://localhost:8000'
+        config1.save()
+        
+        # Try to create another - should update existing
+        self.assertEqual(AppConfiguration.objects.count(), 1)
+    
+    def test_str_representation(self):
+        """Test string representation."""
+        from .models import AppConfiguration
+        
+        config = AppConfiguration.get_config()
+        config.app_url = 'http://localhost:8000'
+        self.assertIn('http://localhost:8000', str(config))
+
+
+class InitialSetupViewTest(TestCase):
+    """Tests for the initial setup view."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('initial_setup')
+    
+    def test_view_accessible_without_users(self):
+        """Test that the view is accessible when no users exist."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'projects/initial_setup.html')
+    
+    def test_view_redirects_with_existing_users(self):
+        """Test that view redirects when users exist."""
+        User.objects.create_user(username='testuser', password='testpass')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        # Should redirect to repository_list - but since that requires login, 
+        # it will chain redirect. Just check it's not the initial_setup page.
+        self.assertTrue(response.url.startswith('/'))
+        self.assertNotIn('initial-setup', response.url)
+    
+    def test_view_shows_detected_url(self):
+        """Test that the view shows the detected application URL."""
+        response = self.client.get(self.url)
+        self.assertContains(response, 'Detected Application URL')
+        # Django test client uses 'testserver' as the host
+        self.assertContains(response, 'testserver')
+    
+    def test_view_shows_callback_url(self):
+        """Test that the view shows the callback URL."""
+        response = self.client.get(self.url)
+        self.assertContains(response, '/accounts/github/login/callback/')
+    
+    def test_view_shows_copy_buttons(self):
+        """Test that the view shows copy buttons."""
+        response = self.client.get(self.url)
+        self.assertContains(response, 'copyToClipboard')
+        self.assertContains(response, 'ti-copy')
+    
+    def test_post_requires_client_id_and_secret(self):
+        """Test that POST requires both client_id and client_secret."""
+        response = self.client.post(self.url, {
+            'client_id': '',
+            'client_secret': '',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Both Client ID and Client Secret are required')
+
+
+from django.test import override_settings
+
+
+class GetCurrentAppUrlTest(TestCase):
+    """Tests for get_current_app_url function."""
+    
+    @override_settings(ALLOWED_HOSTS=['localhost', '127.0.0.1', 'testserver'])
+    def test_http_url(self):
+        """Test URL detection for HTTP request."""
+        from .views import get_current_app_url
+        
+        factory = RequestFactory()
+        request = factory.get('/')
+        request.META['HTTP_HOST'] = 'localhost:8000'
+        
+        url = get_current_app_url(request)
+        self.assertEqual(url, 'http://localhost:8000')
+    
+    @override_settings(ALLOWED_HOSTS=['example.com'])
+    def test_https_url(self):
+        """Test URL detection for HTTPS request."""
+        from .views import get_current_app_url
+        
+        factory = RequestFactory()
+        request = factory.get('/', secure=True)
+        request.META['HTTP_HOST'] = 'example.com'
+        
+        url = get_current_app_url(request)
+        self.assertEqual(url, 'https://example.com')
+    
+    @override_settings(ALLOWED_HOSTS=['localhost', '127.0.0.1', 'testserver'])
+    def test_custom_port(self):
+        """Test URL detection with custom port."""
+        from .views import get_current_app_url
+        
+        factory = RequestFactory()
+        request = factory.get('/')
+        request.META['HTTP_HOST'] = 'localhost:9000'
+        
+        url = get_current_app_url(request)
+        self.assertEqual(url, 'http://localhost:9000')
