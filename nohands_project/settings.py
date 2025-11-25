@@ -63,6 +63,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'nohands_project.middleware.SocialAppErrorMiddleware',
     'nohands_project.middleware.InitialSetupMiddleware',
+    'nohands_project.cleanup_cookies_middleware.CleanupOldCookiesMiddleware',  # Nettoie les anciens cookies
 ]
 
 ROOT_URLCONF = 'nohands_project.urls'

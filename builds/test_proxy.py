@@ -14,6 +14,17 @@ from builds.docker_utils import start_container
 from projects.models import GitRepository, Commit
 
 
+def create_mock_response(status_code=200, content=b'', headers=None, cookies=None):
+    """Helper function to create a properly configured mock response."""
+    mock_response = Mock()
+    mock_response.status_code = status_code
+    mock_response.content = content
+    mock_response.headers = headers or {'content-type': 'text/html; charset=utf-8'}
+    mock_response.cookies = cookies or []  # Empty list by default
+    mock_response.iter_content = lambda chunk_size: [content]
+    return mock_response
+
+
 class ProxyURLRewritingTests(TestCase):
     """Test that URLs are correctly rewritten in proxied responses."""
     
@@ -51,16 +62,13 @@ class ProxyURLRewritingTests(TestCase):
     def test_absolute_urls_rewritten_in_html(self, mock_get):
         """Test that absolute URLs are rewritten in HTML responses."""
         # Mock response with absolute URLs
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'text/html; charset=utf-8'}
-        mock_response.content = b'''
+        html_content = b'''
         <html>
             <a href="http://localhost:9000/page">Link</a>
             <a href="http://127.0.0.1:9000/admin/">Admin</a>
         </html>
         '''
-        mock_get.return_value = mock_response
+        mock_get.return_value = create_mock_response(content=html_content)
         
         response = self.client.get(f'/builds/{self.build.id}/fwd/')
         
@@ -73,17 +81,14 @@ class ProxyURLRewritingTests(TestCase):
     @patch('builds.views.requests.get')
     def test_relative_urls_rewritten_in_html(self, mock_get):
         """Test that relative URLs are rewritten in HTML responses."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'text/html; charset=utf-8'}
-        mock_response.content = b'''
+        html_content = b'''
         <html>
             <a href="/login/">Login</a>
             <form action="/submit/">
             <img src="/static/logo.png">
         </html>
         '''
-        mock_get.return_value = mock_response
+        mock_get.return_value = create_mock_response(content=html_content)
         
         response = self.client.get(f'/builds/{self.build.id}/fwd/')
         
@@ -95,14 +100,15 @@ class ProxyURLRewritingTests(TestCase):
     @patch('builds.views.requests.get')
     def test_redirect_location_rewritten(self, mock_get):
         """Test that redirect Location headers are rewritten."""
-        mock_response = Mock()
-        mock_response.status_code = 302
-        mock_response.headers = {
+        headers = {
             'content-type': 'text/html',
             'location': '/admin/login/'
         }
-        mock_response.content = b''
-        mock_get.return_value = mock_response
+        mock_get.return_value = create_mock_response(
+            status_code=302,
+            content=b'',
+            headers=headers
+        )
         
         response = self.client.get(f'/builds/{self.build.id}/fwd/')
         
@@ -144,11 +150,11 @@ class ProxyCookieHandlingTests(TestCase):
     @patch('builds.views.requests.get')
     def test_nohands_cookies_filtered_out(self, mock_get):
         """Test that NoHands cookies are not forwarded to container."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'text/plain'}
-        mock_response.iter_content = lambda chunk_size: [b'test']
-        mock_get.return_value = mock_response
+        mock_get.return_value = create_mock_response(
+            status_code=200,
+            content=b'test',
+            headers={'content-type': 'text/plain'}
+        )
         
         # Create request with NoHands cookies
         request = self.factory.get('/')
@@ -208,11 +214,11 @@ class ProxyCSRFHeaderTests(TestCase):
     @patch('builds.views.requests.post')
     def test_csrf_headers_set_for_post(self, mock_post):
         """Test that Origin and Referer headers are set for POST requests."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'text/plain'}
-        mock_response.iter_content = lambda chunk_size: [b'test']
-        mock_post.return_value = mock_response
+        mock_post.return_value = create_mock_response(
+            status_code=200,
+            content=b'test',
+            headers={'content-type': 'text/plain'}
+        )
         
         request = self.factory.post('/')
         request.user = self.user
@@ -224,7 +230,8 @@ class ProxyCSRFHeaderTests(TestCase):
         headers = call_args[1]['headers']
         
         self.assertEqual(headers['Host'], f'127.0.0.1:{self.build.host_port}')
-        self.assertEqual(headers['Referer'], f'http://127.0.0.1:{self.build.host_port}/')
+        # Le Referer doit inclure le path complet maintenant
+        self.assertEqual(headers['Referer'], f'http://127.0.0.1:{self.build.host_port}/submit/')
         self.assertEqual(headers['Origin'], f'http://127.0.0.1:{self.build.host_port}')
 
 
@@ -316,11 +323,11 @@ class ProxyAuthenticationTests(TestCase):
     @patch('builds.views.requests.get')
     def test_authenticated_user_can_access_proxy(self, mock_get):
         """Test that authenticated users can access the proxy."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.headers = {'content-type': 'text/plain'}
-        mock_response.iter_content = lambda chunk_size: [b'test']
-        mock_get.return_value = mock_response
+        mock_get.return_value = create_mock_response(
+            status_code=200,
+            content=b'test',
+            headers={'content-type': 'text/plain'}
+        )
         
         self.client.login(username='testuser', password='testpass')
         response = self.client.get(f'/builds/{self.build.id}/fwd/')

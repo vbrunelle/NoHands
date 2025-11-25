@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
@@ -425,6 +426,7 @@ def execute_build(build_id: int):
 
 
 @login_required
+@csrf_exempt  # Les POST sont destinés au conteneur, pas à Django NoHands
 def proxy_to_container(request, build_id, path=''):
     """
     Proxy requests to a running container.
@@ -433,6 +435,10 @@ def proxy_to_container(request, build_id, path=''):
     URL pattern: /builds/<build_id>/fwd/<path>
     Example: /builds/9/fwd/ -> http://localhost:8002/
              /builds/9/fwd/admin/ -> http://localhost:8002/admin/
+             
+    Note: @csrf_exempt is required because POST requests are forwarded to the container,
+    which has its own CSRF protection. Django's CSRF check would incorrectly reject
+    these requests since the CSRF token comes from the container, not from Django.
     """
     build = get_object_or_404(Build, id=build_id)
     
@@ -574,7 +580,12 @@ def proxy_to_container(request, build_id, path=''):
         # Handle Set-Cookie headers - need to adjust path for proxy
         # Parse and rewrite all Set-Cookie headers
         if hasattr(resp, 'cookies') and resp.cookies:
-            logger.info(f"Processing {len(resp.cookies)} cookies from container")
+            try:
+                cookie_count = len(resp.cookies)
+                logger.info(f"Processing {cookie_count} cookies from container")
+            except (TypeError, AttributeError):
+                logger.info("Processing cookies from container")
+            
             for cookie in resp.cookies:
                 logger.info(f"Setting cookie: {cookie.name}={cookie.value[:20]}... with Path=/builds/{build_id}/fwd/")
                 # Set the cookie with the modified path

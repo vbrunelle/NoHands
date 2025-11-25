@@ -795,8 +795,11 @@ class DockerfileTemplatesTest(TestCase):
         templates = get_dockerfile_templates()
         django_template = templates.get('Django', '')
         
-        self.assertIn('gunicorn', django_template.lower())
+        # Vérifier que le template contient les éléments essentiels
         self.assertIn('django', django_template.lower())
+        self.assertIn('runserver', django_template.lower())  # Utilise runserver pour dev
+        self.assertIn('configure_csrf', django_template.lower())  # Script de configuration CSRF
+        self.assertIn('entrypoint.sh', django_template.lower())  # Utilise un entrypoint
     
     def test_flask_template_content(self):
         """Test Flask template has correct content."""

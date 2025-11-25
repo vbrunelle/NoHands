@@ -259,7 +259,8 @@ application = get_wsgi_application()
             
             # Générer un tag d'image
             image_name = f"nohands-test-build-{build.id}"
-            image_tag = f"{image_name}:latest"
+            image_tag = "latest"
+            full_image_tag = f"{image_name}:{image_tag}"
             
             result = run_build_sync(
                 source_dir=project_dir,
@@ -273,10 +274,14 @@ application = get_wsgi_application()
                 self.fail(f"Build failed: {result.error_message}\nLogs:\n{result.logs}")
             
             build.status = 'success'
-            build.image_tag = image_tag
+            build.image_tag = full_image_tag
             build.save()
             
-            print(f"    ✓ Build réussi: {image_tag}")
+            print(f"    ✓ Build réussi: {full_image_tag}")
+            print(f"    Logs du build:")
+            for line in result.logs.split('\n')[-10:]:
+                if line.strip():
+                    print(f"      {line}")
             
         except Exception as e:
             self.fail(f"Dagger build failed: {e}")
@@ -286,7 +291,7 @@ application = get_wsgi_application()
         
         try:
             container_id, host_port = start_container(
-                image_tag=image_tag,
+                image_tag=full_image_tag,  # Utiliser le tag complet avec le nom
                 container_port=8000,
                 container_name=f"nohands-test-build-{build.id}"
             )
