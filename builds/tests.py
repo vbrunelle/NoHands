@@ -322,6 +322,11 @@ class URLRoutingTest(TestCase):
         url = reverse('build_list')
         self.assertEqual(url, '/builds/')
     
+    def test_container_list_url_resolves(self):
+        """Test container list URL resolves correctly."""
+        url = reverse('container_list')
+        self.assertEqual(url, '/builds/containers/')
+    
     def test_build_detail_url_resolves(self):
         """Test build detail URL resolves correctly."""
         url = reverse('build_detail', args=[1])
@@ -346,6 +351,104 @@ class URLRoutingTest(TestCase):
         """Test container logs URL resolves correctly."""
         url = reverse('container_logs', args=[1])
         self.assertEqual(url, '/builds/1/container-logs/')
+
+
+class ContainerListViewTest(TestCase):
+    """Tests for container list view."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse('container_list')
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            sha="abc123",
+            message="Test",
+            author="Test",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_view_url_accessible(self):
+        """Test that the view is accessible."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+    
+    def test_view_uses_correct_template(self):
+        """Test that correct template is used."""
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, 'builds/container_list.html')
+    
+    def test_view_shows_successful_builds(self):
+        """Test that only successful builds are displayed."""
+        # Create a successful build
+        success_build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            image_tag="test:abc123"
+        )
+        # Create a failed build (should not appear)
+        Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="failed"
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "test-repo")
+        self.assertContains(response, "test:abc123")
+    
+    def test_view_shows_running_container_status(self):
+        """Test that running container status is displayed."""
+        Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="running",
+            host_port=8080,
+            container_id="abc123container"
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "Running")
+        self.assertContains(response, "8080")
+    
+    def test_view_shows_stopped_container_status(self):
+        """Test that stopped container status is displayed."""
+        Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="stopped"
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "Stopped")
+    
+    def test_view_empty_state(self):
+        """Test that empty state is displayed when no builds."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "No containers available")
+    
+    def test_view_requires_login(self):
+        """Test that the view requires authentication."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)  # Redirects to login
 
 
 class BuildModelExtendedTest(TestCase):

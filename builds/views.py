@@ -58,6 +58,18 @@ def build_list(request):
 
 
 @login_required
+def container_list(request):
+    """List all builds with running or available containers."""
+    # Get all builds that have containers (either running or with a successful build that can be started)
+    builds_with_containers = Build.objects.select_related('repository', 'commit').filter(
+        status='success'
+    ).order_by('-created_at')
+    return render(request, 'builds/container_list.html', {
+        'builds': builds_with_containers
+    })
+
+
+@login_required
 def build_detail(request, build_id):
     """View build details and logs."""
     build = get_object_or_404(Build, id=build_id)

@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Containers - NoHands{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="ti ti-container me-2"></i>
+                Containers
+            </h2>
+            <div class="text-muted mt-1">
+                Manage containers from successful builds
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    <div class="col-12">
+        <div class="card">
+            {% if builds %}
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                        <tr>
+                            <th>Build</th>
+                            <th>Repository</th>
+                            <th>Branch</th>
+                            <th>Image</th>
+                            <th>Status</th>
+                            <th>Port</th>
+                            <th>Created</th>
+                            <th class="w-1">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for build in builds %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'build_detail' build.id %}" class="text-reset">
+                                    <strong>#{{ build.id }}</strong>
+                                </a>
+                            </td>
+                            <td>
+                                <i class="ti ti-folder text-muted me-1"></i>
+                                {{ build.repository.name }}
+                            </td>
+                            <td>
+                                <span class="badge bg-blue-lt">
+                                    <i class="ti ti-git-branch"></i>
+                                    {{ build.branch_name }}
+                                </span>
+                            </td>
+                            <td>
+                                <code class="small">{{ build.image_tag|default:"N/A" }}</code>
+                            </td>
+                            <td>
+                                {% if build.container_status == 'running' %}
+                                <span class="badge bg-green-lt">
+                                    <i class="ti ti-player-play"></i>
+                                    Running
+                                </span>
+                                {% elif build.container_status == 'stopped' %}
+                                <span class="badge bg-gray-lt">
+                                    <i class="ti ti-player-stop"></i>
+                                    Stopped
+                                </span>
+                                {% elif build.container_status == 'error' %}
+                                <span class="badge bg-red-lt">
+                                    <i class="ti ti-alert-circle"></i>
+                                    Error
+                                </span>
+                                {% elif build.container_status == 'starting' %}
+                                <span class="badge bg-yellow-lt">
+                                    <i class="ti ti-loader"></i>
+                                    Starting
+                                </span>
+                                {% else %}
+                                <span class="badge bg-gray-lt">
+                                    <i class="ti ti-player-stop"></i>
+                                    Not Started
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if build.container_status == 'running' and build.host_port %}
+                                <a href="{% url 'proxy_to_container' build.id '' %}" target="_blank" class="text-primary">
+                                    <i class="ti ti-external-link me-1"></i>{{ build.host_port }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ build.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <div class="btn-list flex-nowrap">
+                                    {% if build.container_status == 'running' %}
+                                    <a href="{% url 'proxy_to_container' build.id '' %}" target="_blank" class="btn btn-sm btn-success" title="Open Application">
+                                        <i class="ti ti-external-link"></i>
+                                    </a>
+                                    <form action="{% url 'stop_build_container' build.id %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Stop Container">
+                                            <i class="ti ti-player-stop"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <form action="{% url 'start_build_container' build.id %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-success" title="Start Container">
+                                            <i class="ti ti-player-play"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="{% url 'build_detail' build.id %}" class="btn btn-sm btn-primary" title="View Details">
+                                        <i class="ti ti-eye"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-container"></i>
+                    </div>
+                    <p class="empty-title">No containers available</p>
+                    <p class="empty-subtitle text-muted">
+                        Containers will appear here after you have successful builds
+                    </p>
+                    <div class="empty-action">
+                        <a href="{% url 'repository_list' %}" class="btn btn-primary">
+                            <i class="ti ti-git-branch"></i>
+                            View Repositories
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
