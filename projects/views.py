@@ -11,10 +11,20 @@ import os
 from github import Github
 from allauth.socialaccount.models import SocialToken, SocialApp
 
-from .models import GitRepository, Branch, Commit
+from .models import GitRepository, Branch, Commit, AppConfiguration
 from .git_utils import clone_or_update_repo, list_branches, list_commits, GitUtilsError
 
 logger = logging.getLogger(__name__)
+
+
+def get_current_app_url(request):
+    """
+    Detect the current application URL from the request.
+    Returns a URL like 'http://localhost:8000' or 'https://myapp.example.com'.
+    """
+    scheme = 'https' if request.is_secure() else 'http'
+    host = request.get_host()  # Includes port if non-standard
+    return f"{scheme}://{host}"
 
 
 def get_env_file_path():
@@ -24,11 +34,11 @@ def get_env_file_path():
 
 def read_env_values():
     """
-    Read GitHub OAuth credentials from .env file if it exists.
-    Returns a dict with client_id and client_secret (empty strings if not found).
+    Read GitHub OAuth credentials and app URL from .env file if it exists.
+    Returns a dict with client_id, client_secret, and app_url (empty strings if not found).
     """
     env_path = get_env_file_path()
-    values = {'client_id': '', 'client_secret': ''}
+    values = {'client_id': '', 'client_secret': '', 'app_url': ''}
     
     if env_path.exists():
         try:
@@ -43,6 +53,8 @@ def read_env_values():
                             values['client_id'] = value
                         elif key == 'GITHUB_CLIENT_SECRET':
                             values['client_secret'] = value
+                        elif key == 'NOHANDS_APP_URL':
+                            values['app_url'] = value
         except Exception as e:
             logger.warning(f"Failed to read .env file: {e}")
     
@@ -51,19 +63,22 @@ def read_env_values():
         values['client_id'] = os.environ.get('GITHUB_CLIENT_ID', '')
     if not values['client_secret']:
         values['client_secret'] = os.environ.get('GITHUB_CLIENT_SECRET', '')
+    if not values['app_url']:
+        values['app_url'] = os.environ.get('NOHANDS_APP_URL', '')
     
     return values
 
 
-def write_env_values(client_id, client_secret):
+def write_env_values(client_id, client_secret, app_url=None):
     """
-    Write GitHub OAuth credentials to .env file.
+    Write GitHub OAuth credentials and app URL to .env file.
     Creates the file if it doesn't exist, updates existing values if it does.
     """
     env_path = get_env_file_path()
     existing_lines = []
     client_id_found = False
     client_secret_found = False
+    app_url_found = False
     
     # Read existing content
     if env_path.exists():
@@ -77,6 +92,12 @@ def write_env_values(client_id, client_secret):
                     elif stripped.startswith('GITHUB_CLIENT_SECRET='):
                         existing_lines.append(f'GITHUB_CLIENT_SECRET="{client_secret}"\n')
                         client_secret_found = True
+                    elif stripped.startswith('NOHANDS_APP_URL='):
+                        if app_url:
+                            existing_lines.append(f'NOHANDS_APP_URL="{app_url}"\n')
+                        else:
+                            existing_lines.append(line)
+                        app_url_found = True
                     else:
                         existing_lines.append(line)
         except Exception as e:
@@ -87,6 +108,8 @@ def write_env_values(client_id, client_secret):
         existing_lines.append(f'GITHUB_CLIENT_ID="{client_id}"\n')
     if not client_secret_found:
         existing_lines.append(f'GITHUB_CLIENT_SECRET="{client_secret}"\n')
+    if app_url and not app_url_found:
+        existing_lines.append(f'NOHANDS_APP_URL="{app_url}"\n')
     
     # Write file with restrictive permissions
     try:
@@ -144,6 +167,7 @@ def initial_setup(request):
     This page is displayed when no users exist in the system.
     The user must connect via GitHub OAuth to create the first admin account.
     Allows administrators to configure OAuth credentials directly from this page.
+    Automatically detects and stores the application URL.
     """
     # Check if users already exist
     has_users = User.objects.exists()
@@ -152,11 +176,24 @@ def initial_setup(request):
         # If users exist, redirect to the main page
         return redirect('repository_list')
     
+    # Detect the current application URL
+    detected_app_url = get_current_app_url(request)
+    
     # Check if OAuth is already configured
     oauth_configured = SocialApp.objects.filter(provider='github').exists()
     
     # Read default values from .env file or environment
     env_values = read_env_values()
+    
+    # If no app_url in env, use detected URL
+    if not env_values.get('app_url'):
+        env_values['app_url'] = detected_app_url
+    
+    # Calculate callback URL from detected app URL
+    callback_url = f"{detected_app_url}/accounts/github/login/callback/"
+    
+    # Extract domain for site configuration (without protocol)
+    site_domain = request.get_host()
     
     error_message = None
     success_message = None
@@ -170,13 +207,21 @@ def initial_setup(request):
         if not client_id or not client_secret:
             error_message = "Both Client ID and Client Secret are required."
         else:
-            # Save to database
-            db_success = setup_github_oauth(client_id, client_secret)
+            # Save to database with the detected site domain
+            db_success = setup_github_oauth(client_id, client_secret, site_domain)
+            
+            # Save app URL to database
+            try:
+                config = AppConfiguration.get_config()
+                config.app_url = detected_app_url
+                config.save()
+            except Exception as e:
+                logger.warning(f"Failed to save app URL to database: {e}")
             
             # Save to .env file if requested
             env_success = True
             if save_to_env:
-                env_success = write_env_values(client_id, client_secret)
+                env_success = write_env_values(client_id, client_secret, detected_app_url)
             
             if db_success:
                 success_message = "GitHub OAuth configured successfully! You can now connect with GitHub."
@@ -184,6 +229,7 @@ def initial_setup(request):
                 # Update env_values for display
                 env_values['client_id'] = client_id
                 env_values['client_secret'] = client_secret
+                env_values['app_url'] = detected_app_url
             else:
                 error_message = "Failed to save OAuth configuration to database. Please try again."
             
@@ -198,6 +244,9 @@ def initial_setup(request):
         'env_values': env_values,
         'error_message': error_message,
         'success_message': success_message,
+        'detected_app_url': detected_app_url,
+        'callback_url': callback_url,
+        'site_domain': site_domain,
     })
 
 

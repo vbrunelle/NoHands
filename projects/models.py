@@ -4,6 +4,43 @@ from pathlib import Path
 from typing import Optional
 
 
+class AppConfiguration(models.Model):
+    """
+    Singleton model to store application-wide configuration.
+    Only one instance should exist.
+    """
+    app_url = models.URLField(
+        max_length=500, 
+        blank=True, 
+        help_text="Base URL of the application (e.g., http://localhost:8000)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Application Configuration"
+        verbose_name_plural = "Application Configuration"
+
+    def __str__(self) -> str:
+        return f"App Configuration (URL: {self.app_url or 'Not set'})"
+
+    def save(self, *args, **kwargs):
+        """Ensure only one instance exists."""
+        if not self.pk and AppConfiguration.objects.exists():
+            # Update existing instance instead of creating new
+            existing = AppConfiguration.objects.first()
+            existing.app_url = self.app_url
+            existing.save()
+            return
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_config(cls):
+        """Get or create the singleton configuration instance."""
+        config, _ = cls.objects.get_or_create(pk=1)
+        return config
+
+
 class GitRepository(models.Model):
     """
     Represents a Git repository that can be built and deployed.
