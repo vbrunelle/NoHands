@@ -817,3 +817,553 @@ class DockerfileTemplatesTest(TestCase):
         
         self.assertIn('node', nodejs_template.lower())
         self.assertIn('npm', nodejs_template.lower())
+
+
+class PortMappingTest(TestCase):
+    """Tests for container port mapping functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_container_url_with_custom_port(self):
+        """Test container URL is generated correctly with custom port."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_port=3000,
+            host_port=8888,
+            container_status="running"
+        )
+        self.assertEqual(build.container_url, "http://localhost:8888")
+    
+    def test_container_url_with_default_port(self):
+        """Test container URL with default container port."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_port=8080,
+            host_port=49152,
+            container_status="running"
+        )
+        self.assertEqual(build.container_url, "http://localhost:49152")
+    
+    def test_container_url_no_host_port(self):
+        """Test container URL is empty when no host port assigned."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="running",
+            host_port=None
+        )
+        self.assertEqual(build.container_url, "")
+    
+    def test_port_mapping_different_ports(self):
+        """Test port mapping with container port different from host port."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_port=80,  # Container runs on port 80
+            host_port=32768,    # Mapped to host port 32768
+            container_status="running"
+        )
+        # Container URL should use host port
+        self.assertEqual(build.container_url, "http://localhost:32768")
+        # Container port should be the internal port
+        self.assertEqual(build.container_port, 80)
+    
+    @patch('builds.views.threading.Thread')
+    def test_create_build_with_custom_container_port(self, mock_thread):
+        """Test creating a build with custom container port."""
+        url = reverse('build_create', args=[self.repo.id, self.commit.id])
+        
+        response = self.client.post(url, {
+            'container_port': '3000',
+            'dockerfile_source': 'generated',
+            'dockerfile_content': 'FROM node:18\nEXPOSE 3000'
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        
+        build = Build.objects.get(repository=self.repo, commit=self.commit)
+        self.assertEqual(build.container_port, 3000)
+
+
+class DockerUtilsExtendedTest(TestCase):
+    """Extended tests for Docker utilities."""
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_start_container_port_retry(self, mock_run):
+        """Test container start retries on port conflict."""
+        from builds.docker_utils import start_container
+        
+        # First call fails with port conflict, second succeeds
+        mock_run.side_effect = [
+            MagicMock(returncode=1, stderr="port is already allocated"),
+            MagicMock(returncode=0, stdout="container123\n")
+        ]
+        
+        container_id, host_port = start_container(
+            image_tag="test:latest",
+            container_port=8080,
+            host_port=9000
+        )
+        
+        self.assertEqual(container_id, "container123")
+        # Should have been called twice due to retry
+        self.assertEqual(mock_run.call_count, 2)
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_start_container_docker_error(self, mock_run):
+        """Test container start handles Docker errors."""
+        from builds.docker_utils import start_container, DockerError
+        
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stderr="Image not found"
+        )
+        
+        with self.assertRaises(DockerError) as context:
+            start_container(
+                image_tag="nonexistent:latest",
+                container_port=8080,
+                host_port=9000
+            )
+        
+        self.assertIn("Failed to start container", str(context.exception))
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_remove_container_success(self, mock_run):
+        """Test removing a container."""
+        from builds.docker_utils import remove_container
+        
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="abc123\n"
+        )
+        
+        result = remove_container("abc123", force=True)
+        self.assertTrue(result)
+        
+        # Verify force flag was passed
+        call_args = mock_run.call_args[0][0]
+        self.assertIn('-f', call_args)
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_load_image_from_tar(self, mock_run):
+        """Test loading Docker image from tar file."""
+        from builds.docker_utils import load_image_from_tar
+        
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="Loaded image: myapp:v1.0\n"
+        )
+        
+        image_tag = load_image_from_tar("/tmp/test.tar")
+        self.assertEqual(image_tag, "myapp:v1.0")
+    
+    @patch('builds.docker_utils.socket.socket')
+    def test_find_available_port_all_in_use(self, mock_socket):
+        """Test finding available port when all ports are in use."""
+        from builds.docker_utils import find_available_port, DockerError
+        
+        # Create a mock socket that always raises OSError on bind
+        mock_sock_instance = MagicMock()
+        mock_sock_instance.bind.side_effect = OSError("Address already in use")
+        mock_socket.return_value.__enter__.return_value = mock_sock_instance
+        
+        with self.assertRaises(DockerError) as context:
+            find_available_port(start_port=49000, max_attempts=5)
+        
+        self.assertIn("No available port found", str(context.exception))
+
+
+class ContainerLogsAPITest(TestCase):
+    """Tests for container logs API."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+        self.build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            image_tag="test-repo:abc123de",
+            container_id="abc123container",
+            container_status="running",
+            host_port=32768
+        )
+    
+    @patch('builds.views.get_container_logs')
+    @patch('builds.views.get_container_status')
+    def test_get_logs_success(self, mock_status, mock_logs):
+        """Test getting container logs successfully."""
+        mock_logs.return_value = "2025-01-01T00:00:00 Log line 1\n2025-01-01T00:00:01 Log line 2"
+        mock_status.return_value = "running"
+        
+        url = reverse('container_logs', args=[self.build.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertIn("Log line 1", data['logs'])
+        self.assertEqual(data['status'], 'running')
+    
+    @patch('builds.views.get_container_logs')
+    @patch('builds.views.get_container_status')
+    def test_get_logs_with_tail_parameter(self, mock_status, mock_logs):
+        """Test getting container logs with tail parameter."""
+        mock_logs.return_value = "Last 50 lines"
+        mock_status.return_value = "running"
+        
+        url = reverse('container_logs', args=[self.build.id])
+        response = self.client.get(url, {'tail': '50'})
+        
+        self.assertEqual(response.status_code, 200)
+        mock_logs.assert_called_once_with(self.build.container_id, tail=50)
+    
+    @patch('builds.views.get_container_logs')
+    @patch('builds.views.get_container_status')
+    def test_get_logs_invalid_tail_defaults_to_200(self, mock_status, mock_logs):
+        """Test that invalid tail parameter defaults to 200."""
+        mock_logs.return_value = "Logs"
+        mock_status.return_value = "running"
+        
+        url = reverse('container_logs', args=[self.build.id])
+        response = self.client.get(url, {'tail': 'invalid'})
+        
+        self.assertEqual(response.status_code, 200)
+        mock_logs.assert_called_once_with(self.build.container_id, tail=200)
+    
+    @patch('builds.views.get_container_logs')
+    @patch('builds.views.get_container_status')
+    def test_get_logs_updates_container_status_when_exited(self, mock_status, mock_logs):
+        """Test that container status is updated when container exits."""
+        mock_logs.return_value = "Final logs"
+        mock_status.return_value = "exited"
+        
+        url = reverse('container_logs', args=[self.build.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Refresh build from database
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_status, 'stopped')
+
+
+class PortValidationTest(TestCase):
+    """Tests for port validation helper."""
+    
+    def test_valid_port_string(self):
+        """Test validation of valid port as string."""
+        from builds.views import _validate_container_port
+        
+        self.assertEqual(_validate_container_port('8080'), 8080)
+        self.assertEqual(_validate_container_port('3000'), 3000)
+        self.assertEqual(_validate_container_port('443'), 443)
+    
+    def test_valid_port_integer(self):
+        """Test validation of valid port as integer."""
+        from builds.views import _validate_container_port
+        
+        self.assertEqual(_validate_container_port(8080), 8080)
+        self.assertEqual(_validate_container_port(80), 80)
+    
+    def test_invalid_port_out_of_range(self):
+        """Test validation of out-of-range ports."""
+        from builds.views import _validate_container_port
+        
+        # Too low
+        self.assertEqual(_validate_container_port(0), 8080)
+        self.assertEqual(_validate_container_port(-1), 8080)
+        
+        # Too high
+        self.assertEqual(_validate_container_port(65536), 8080)
+        self.assertEqual(_validate_container_port(100000), 8080)
+    
+    def test_invalid_port_non_numeric(self):
+        """Test validation of non-numeric port values."""
+        from builds.views import _validate_container_port
+        
+        self.assertEqual(_validate_container_port('invalid'), 8080)
+        self.assertEqual(_validate_container_port('abc'), 8080)
+        self.assertEqual(_validate_container_port(None), 8080)
+        self.assertEqual(_validate_container_port(''), 8080)
+    
+    def test_custom_default_port(self):
+        """Test validation with custom default port."""
+        from builds.views import _validate_container_port
+        
+        self.assertEqual(_validate_container_port('invalid', default=3000), 3000)
+        self.assertEqual(_validate_container_port(None, default=80), 80)
+
+
+class ContainerControlViewsExtendedTest(TestCase):
+    """Extended tests for container control views."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+        self.build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            image_tag="test-repo:abc123de"
+        )
+    
+    def test_start_container_already_running(self):
+        """Test starting container when one is already running."""
+        self.build.container_status = 'running'
+        self.build.container_id = 'existing123'
+        self.build.save()
+        
+        url = reverse('start_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, 302)
+        
+        # Container status should remain unchanged
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_status, 'running')
+    
+    @patch('builds.views.start_container')
+    @patch('builds.views.load_image_from_tar')
+    @patch('os.path.exists')
+    def test_start_container_success(self, mock_exists, mock_load, mock_start):
+        """Test starting a container successfully."""
+        mock_exists.return_value = False
+        mock_start.return_value = ("newcontainer123", 49152)
+        
+        url = reverse('start_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, 302)
+        
+        # Container info should be saved
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_id, "newcontainer123")
+        self.assertEqual(self.build.host_port, 49152)
+        self.assertEqual(self.build.container_status, 'running')
+    
+    @patch('builds.views.start_container')
+    def test_start_container_docker_error(self, mock_start):
+        """Test starting container with Docker error."""
+        from builds.docker_utils import DockerError
+        mock_start.side_effect = DockerError("Connection refused")
+        
+        url = reverse('start_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, 302)
+        
+        # Container status should be error
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_status, 'error')
+    
+    @patch('builds.views.stop_container')
+    @patch('builds.views.remove_container')
+    def test_stop_container_success(self, mock_remove, mock_stop):
+        """Test stopping a container successfully."""
+        self.build.container_id = 'running123'
+        self.build.container_status = 'running'
+        self.build.host_port = 32768
+        self.build.save()
+        
+        mock_stop.return_value = True
+        mock_remove.return_value = True
+        
+        url = reverse('stop_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, 302)
+        
+        # Container info should be cleared
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_id, '')
+        self.assertIsNone(self.build.host_port)
+        self.assertEqual(self.build.container_status, 'stopped')
+    
+    @patch('builds.views.stop_container')
+    def test_stop_container_docker_error(self, mock_stop):
+        """Test stopping container with Docker error."""
+        from builds.docker_utils import DockerError
+        
+        self.build.container_id = 'running123'
+        self.build.container_status = 'running'
+        self.build.save()
+        
+        mock_stop.side_effect = DockerError("Timeout")
+        
+        url = reverse('stop_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, 302)
+        
+        # Container info should remain unchanged
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_id, 'running123')
+
+
+class BuildDetailViewExtendedTest(TestCase):
+    """Extended tests for build detail view with container info."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_build_detail_shows_container_url(self):
+        """Test that build detail shows container URL when running."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="running",
+            container_id="abc123",
+            host_port=32768,
+            container_port=8080
+        )
+        
+        url = reverse('build_detail', args=[build.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "http://localhost:32768")
+        self.assertContains(response, "Application URL")
+    
+    def test_build_detail_shows_port_mapping(self):
+        """Test that build detail shows port mapping info."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="running",
+            container_id="abc123",
+            host_port=49000,
+            container_port=3000
+        )
+        
+        url = reverse('build_detail', args=[build.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        # Should show both container port and host port
+        self.assertContains(response, "3000")
+        self.assertContains(response, "49000")
