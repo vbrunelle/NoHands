@@ -1,5 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.contrib.auth.models import User
 from django.utils import timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -85,6 +86,13 @@ class BuildListViewTest(TestCase):
         self.client = Client()
         self.url = reverse('build_list')
         
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
         # Create test data
         self.repo = GitRepository.objects.create(
             name="test-repo",
@@ -127,6 +135,13 @@ class BuildDetailViewTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
         
         # Create test data
         self.repo = GitRepository.objects.create(
@@ -176,6 +191,13 @@ class BuildCreateViewTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
         
         # Create test data
         self.repo = GitRepository.objects.create(

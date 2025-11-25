@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Account Connections - NoHands{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="ti ti-link me-2"></i>
+                Account Connections
+            </h2>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-brand-github me-2"></i>
+                    GitHub
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if form.accounts %}
+                <p class="text-muted mb-3">
+                    You have connected the following GitHub account:
+                </p>
+                {% for account in form.accounts %}
+                <div class="list-group list-group-flush mb-3">
+                    <div class="list-group-item">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <i class="ti ti-brand-github me-2" style="font-size: 1.5rem;"></i>
+                                    <div>
+                                        <strong>{{ account.display }}</strong>
+                                        <div class="text-muted small">Connected via GitHub OAuth</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <form method="post" action="{% url 'socialaccount_connections' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="account" value="{{ account.id }}">
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="ti ti-unlink me-2"></i>
+                                        Disconnect
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-brand-github"></i>
+                    </div>
+                    <p class="empty-title">No GitHub account connected</p>
+                    <p class="empty-subtitle text-muted">
+                        Connect your GitHub account to access your repositories
+                    </p>
+                    <div class="empty-action">
+                        <a href="/accounts/github/login/" class="btn btn-primary">
+                            <i class="ti ti-brand-github me-2"></i>
+                            Connect GitHub
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="{% url 'repository_list' %}" class="btn btn-secondary">
+                <i class="ti ti-arrow-left me-2"></i>
+                Back to Repositories
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

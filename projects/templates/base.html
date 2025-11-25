@@ -46,7 +46,7 @@
                 </button>
                 <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
                     <a href="{% url 'repository_list' %}" class="text-white text-decoration-none">
-                        <i class="ti ti-rocket icon me-2"></i>
+                        <i class="ti ti-rocket me-2"></i>
                         NoHands
                     </a>
                 </h1>
@@ -76,7 +76,7 @@
                     <div class="nav-item d-none d-md-flex me-3">
                         <div class="btn-list">
                             <a href="{% url 'account_login' %}" class="btn btn-white">
-                                <i class="ti ti-login icon"></i>
+                                <i class="ti ti-login"></i>
                                 Login
                             </a>
                         </div>
@@ -85,7 +85,7 @@
                     <div class="nav-item d-none d-md-flex me-3">
                         <div class="btn-list">
                             <a href="/admin/" class="btn btn-white" target="_blank">
-                                <i class="ti ti-settings icon"></i>
+                                <i class="ti ti-settings"></i>
                                 Admin
                             </a>
                         </div>
@@ -97,7 +97,7 @@
                             <li class="nav-item">
                                 <a class="nav-link text-white" href="{% url 'repository_list' %}">
                                     <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                        <i class="ti ti-git-branch icon"></i>
+                                        <i class="ti ti-git-branch"></i>
                                     </span>
                                     <span class="nav-link-title">Repositories</span>
                                 </a>
@@ -105,7 +105,7 @@
                             <li class="nav-item">
                                 <a class="nav-link text-white" href="{% url 'build_list' %}">
                                     <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                        <i class="ti ti-box icon"></i>
+                                        <i class="ti ti-box"></i>
                                     </span>
                                     <span class="nav-link-title">Builds</span>
                                 </a>
@@ -113,7 +113,7 @@
                             <li class="nav-item">
                                 <a class="nav-link text-white" href="/api/">
                                     <span class="nav-link-icon d-md-none d-lg-inline-block">
-                                        <i class="ti ti-api icon"></i>
+                                        <i class="ti ti-api"></i>
                                     </span>
                                     <span class="nav-link-title">API</span>
                                 </a>
@@ -136,11 +136,11 @@
                                 <div class="d-flex">
                                     <div>
                                         {% if message.tags == 'success' %}
-                                        <i class="ti ti-check icon alert-icon"></i>
+                                        <i class="ti ti-check alert-icon"></i>
                                         {% elif message.tags == 'error' %}
-                                        <i class="ti ti-alert-circle icon alert-icon"></i>
+                                        <i class="ti ti-alert-circle alert-icon"></i>
                                         {% else %}
-                                        <i class="ti ti-info-circle icon alert-icon"></i>
+                                        <i class="ti ti-info-circle alert-icon"></i>
                                         {% endif %}
                                     </div>
                                     <div>{{ message }}</div>

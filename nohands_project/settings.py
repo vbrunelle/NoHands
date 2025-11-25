@@ -41,13 +41,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',  # Required for allauth
     'rest_framework',
+    'projects',  # Must come before allauth to override templates
+    'builds',
+    'api',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.github',
-    'projects',
-    'builds',
-    'api',
 ]
 
 SITE_ID = 1
@@ -61,6 +61,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'nohands_project.middleware.SocialAppErrorMiddleware',
+    'nohands_project.middleware.InitialSetupMiddleware',
 ]
 
 ROOT_URLCONF = 'nohands_project.urls'
@@ -139,6 +141,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
 }
 
 # NoHands specific settings
@@ -167,20 +176,22 @@ AUTHENTICATION_BACKENDS = [
 ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 ACCOUNT_EMAIL_REQUIRED = False
-LOGIN_REDIRECT_URL = '/repositories/connect/'
+LOGIN_REDIRECT_URL = '/'
+LOGIN_URL = '/accounts/github/login/'
 LOGOUT_REDIRECT_URL = '/'
 
-# GitHub OAuth settings (from environment)
+# GitHub OAuth settings
+# Note: GitHub OAuth credentials must be configured using the setup_github_oauth management command
+# or via the Django admin panel. See GITHUB_OAUTH.md for instructions.
 SOCIALACCOUNT_PROVIDERS = {
     'github': {
         'SCOPE': [
             'user',
             'repo',
         ],
-        'APP': {
-            'client_id': os.environ.get('GITHUB_CLIENT_ID', ''),
-            'secret': os.environ.get('GITHUB_CLIENT_SECRET', ''),
-            'key': ''
-        }
+        'TOKEN_STRATEGY': 'allauth.socialaccount.providers.oauth2.client.STORE',
     }
 }
+
+# Store OAuth tokens so we can use them to access GitHub API
+SOCIALACCOUNT_STORE_TOKENS = True

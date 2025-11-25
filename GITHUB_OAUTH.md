@@ -14,55 +14,59 @@ NoHands now supports GitHub OAuth authentication, allowing users to:
 
 ### 1. Create a GitHub OAuth App
 
-1. Go to GitHub Settings → Developer settings → OAuth Apps
+1. Go to GitHub Settings → Developer settings → OAuth Apps (https://github.com/settings/developers)
 2. Click "New OAuth App"
 3. Fill in the application details:
    - **Application name**: NoHands (or your preferred name)
-   - **Homepage URL**: `http://localhost:8000` (or your domain)
-   - **Authorization callback URL**: `http://localhost:8000/accounts/github/login/callback/`
+   - **Homepage URL**: `http://127.0.0.1:8000` (or your domain)
+   - **Authorization callback URL**: `http://127.0.0.1:8000/accounts/github/login/callback/`
 4. Click "Register application"
 5. Note your **Client ID** and generate a **Client Secret**
 
-### 2. Configure NoHands
+> **Important**: Use `127.0.0.1` instead of `localhost` for the URLs. While they often work interchangeably, `127.0.0.1` is more reliable for OAuth callbacks. Make sure to access your application using the same URL you configured in GitHub (e.g., `http://127.0.0.1:8000`).
 
-Set the following environment variables:
+### 2. Configure NoHands (Quick Setup)
+
+The easiest way to configure GitHub OAuth is using the management command:
 
 ```bash
+# Set environment variables
 export GITHUB_CLIENT_ID="your_github_client_id"
 export GITHUB_CLIENT_SECRET="your_github_client_secret"
+
+# Run setup command
+python manage.py setup_github_oauth
 ```
 
-Or add them to your `.env` file:
+This will automatically:
+- Configure the Site settings
+- Create the GitHub Social Application
+- Link everything together
+
+For production, you can specify a custom domain:
 
 ```bash
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
+python manage.py setup_github_oauth --site-domain yourdomain.com
 ```
 
-### 3. Configure Social Application in Django Admin
+### Alternative: Manual Configuration via Django Admin
+
+If you prefer to configure manually:
 
 1. Start the Django server: `python manage.py runserver`
-2. Go to Django Admin: `http://localhost:8000/admin/`
-3. Navigate to **Social Applications** under **Sites**
-4. Click **Add Social Application**
-5. Fill in the form:
+2. Go to Django Admin: `http://127.0.0.1:8000/admin/`
+3. Navigate to **Sites** and update the default site:
+   - **Domain name**: `127.0.0.1:8000` (for development) or your domain
+   - **Display name**: NoHands
+4. Navigate to **Social Applications** under **Sites**
+5. Click **Add Social Application**
+6. Fill in the form:
    - **Provider**: GitHub
-   - **Name**: GitHub (or any name you prefer)
+   - **Name**: GitHub
    - **Client id**: Your GitHub OAuth App Client ID
    - **Secret key**: Your GitHub OAuth App Client Secret
-   - **Sites**: Select your site (usually `example.com` or create a new one)
-6. Click **Save**
-
-### 4. Create a Site (if needed)
-
-If you don't have a site configured:
-
-1. Go to Django Admin: `http://localhost:8000/admin/`
-2. Navigate to **Sites**
-3. Edit the default site or add a new one:
-   - **Domain name**: `localhost:8000` (for development) or your domain
-   - **Display name**: NoHands
-4. Click **Save**
+   - **Sites**: Select your site
+7. Click **Save**
 
 ## Usage
 
@@ -70,7 +74,7 @@ If you don't have a site configured:
 
 #### 1. Login with GitHub
 
-1. Navigate to NoHands: `http://localhost:8000/`
+1. Navigate to NoHands: `http://127.0.0.1:8000/`
 2. Click the **"Login with GitHub"** button in the top navigation
 3. You'll be redirected to GitHub to authorize the application
 4. After authorization, you'll be logged in to NoHands
@@ -96,7 +100,7 @@ If you don't have a site configured:
 
 Administrators can still add repositories manually through the Django Admin interface:
 
-1. Go to Django Admin: `http://localhost:8000/admin/`
+1. Go to Django Admin: `http://127.0.0.1:8000/admin/`
 2. Navigate to **Git Repositories**
 3. Click **Add Git Repository**
 4. Fill in the repository details manually
@@ -159,8 +163,9 @@ Administrators can still add repositories manually through the Django Admin inte
 **Solution**: 
 1. Go to your GitHub OAuth App settings
 2. Update the **Authorization callback URL** to match your application:
-   - Development: `http://localhost:8000/accounts/github/login/callback/`
+   - Development: `http://127.0.0.1:8000/accounts/github/login/callback/`
    - Production: `https://yourdomain.com/accounts/github/login/callback/`
+3. Make sure you access your application using the same URL (e.g., use `http://127.0.0.1:8000` instead of `http://localhost:8000` if that's what you configured in GitHub)
 
 ## API Access
 
@@ -168,10 +173,10 @@ The GitHub integration works seamlessly with the existing REST API. Connected re
 
 ```bash
 # List all repositories
-curl http://localhost:8000/api/repositories/
+curl http://127.0.0.1:8000/api/repositories/
 
 # Get repository details
-curl http://localhost:8000/api/repositories/1/
+curl http://127.0.0.1:8000/api/repositories/1/
 ```
 
 ## Future Enhancements

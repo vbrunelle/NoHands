@@ -7,7 +7,7 @@
     <div class="row align-items-center">
         <div class="col">
             <h2 class="page-title">
-                <i class="ti ti-box icon me-2"></i>
+                <i class="ti ti-box me-2"></i>
                 Build History
             </h2>
         </div>
@@ -39,12 +39,12 @@
                                 <strong>#{{ build.id }}</strong>
                             </td>
                             <td>
-                                <i class="ti ti-folder icon text-muted me-1"></i>
+                                <i class="ti ti-folder text-muted me-1"></i>
                                 {{ build.repository.name }}
                             </td>
                             <td>
                                 <span class="badge bg-blue-lt">
-                                    <i class="ti ti-git-branch icon"></i>
+                                    <i class="ti ti-git-branch"></i>
                                     {{ build.branch_name }}
                                 </span>
                             </td>
@@ -54,27 +54,27 @@
                             <td>
                                 <span class="badge badge-{{ build.status }}">
                                     {% if build.status == 'pending' %}
-                                    <i class="ti ti-clock icon"></i>
+                                    <i class="ti ti-clock"></i>
                                     {% elif build.status == 'running' %}
-                                    <i class="ti ti-loader icon"></i>
+                                    <i class="ti ti-loader"></i>
                                     {% elif build.status == 'success' %}
-                                    <i class="ti ti-check icon"></i>
+                                    <i class="ti ti-check"></i>
                                     {% elif build.status == 'failed' %}
-                                    <i class="ti ti-x icon"></i>
+                                    <i class="ti ti-x"></i>
                                     {% elif build.status == 'cancelled' %}
-                                    <i class="ti ti-ban icon"></i>
+                                    <i class="ti ti-ban"></i>
                                     {% endif %}
                                     {{ build.get_status_display }}
                                 </span>
                             </td>
                             <td class="text-muted">
-                                <i class="ti ti-clock icon me-1"></i>
+                                <i class="ti ti-clock me-1"></i>
                                 {{ build.duration }}
                             </td>
                             <td class="text-muted">{{ build.created_at|date:"Y-m-d H:i" }}</td>
                             <td class="text-end">
                                 <a href="{% url 'build_detail' build.id %}" class="btn btn-sm btn-primary">
-                                    <i class="ti ti-eye icon"></i>
+                                    <i class="ti ti-eye"></i>
                                     View
                                 </a>
                             </td>
@@ -87,7 +87,7 @@
             <div class="card-body">
                 <div class="empty">
                     <div class="empty-icon">
-                        <i class="ti ti-box icon"></i>
+                        <i class="ti ti-box"></i>
                     </div>
                     <p class="empty-title">No builds yet</p>
                     <p class="empty-subtitle text-muted">
@@ -95,7 +95,7 @@
                     </p>
                     <div class="empty-action">
                         <a href="{% url 'repository_list' %}" class="btn btn-primary">
-                            <i class="ti ti-git-branch icon"></i>
+                            <i class="ti ti-git-branch"></i>
                             View Repositories
                         </a>
                     </div>

@@ -7,7 +7,7 @@
     <div class="row align-items-center">
         <div class="col">
             <h2 class="page-title">
-                <i class="ti ti-rocket icon me-2"></i>
+                <i class="ti ti-rocket me-2"></i>
                 Create New Build
             </h2>
         </div>
@@ -25,7 +25,7 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">Repository</div>
                         <div class="datagrid-content">
-                            <i class="ti ti-folder icon text-muted me-1"></i>
+                            <i class="ti ti-folder text-muted me-1"></i>
                             {{ repository.name }}
                         </div>
                     </div>
@@ -42,14 +42,14 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">Author</div>
                         <div class="datagrid-content">
-                            <i class="ti ti-user icon text-muted me-1"></i>
+                            <i class="ti ti-user text-muted me-1"></i>
                             {{ commit.author }}
                         </div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">Date</div>
                         <div class="datagrid-content">
-                            <i class="ti ti-clock icon text-muted me-1"></i>
+                            <i class="ti ti-clock text-muted me-1"></i>
                             {{ commit.committed_at|date:"Y-m-d H:i:s" }}
                         </div>
                     </div>
@@ -79,11 +79,11 @@
                     
                     <div class="mt-4">
                         <button type="submit" class="btn btn-success">
-                            <i class="ti ti-rocket icon"></i>
+                            <i class="ti ti-rocket"></i>
                             Start Build
                         </button>
                         <a href="{% url 'repository_detail' repository.id %}" class="btn btn-secondary ms-2">
-                            <i class="ti ti-x icon"></i>
+                            <i class="ti ti-x"></i>
                             Cancel
                         </a>
                     </div>
@@ -96,7 +96,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="ti ti-info-circle icon me-2"></i>
+                    <i class="ti ti-info-circle me-2"></i>
                     About Builds
                 </h3>
             </div>

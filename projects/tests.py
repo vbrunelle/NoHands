@@ -132,6 +132,12 @@ class RepositoryListViewTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.url = reverse('repository_list')
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
     
     def test_view_url_accessible(self):
         """Test that the view is accessible."""
@@ -159,6 +165,12 @@ class RepositoryDetailViewTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
         self.repo = GitRepository.objects.create(
             name="test-repo",
             url="https://github.com/test/repo.git",
@@ -185,13 +197,14 @@ class RepositoryDetailViewTest(TestCase):
     @patch('projects.views.clone_or_update_repo')
     @patch('projects.views.list_branches')
     def test_refresh_branches(self, mock_list_branches, mock_clone):
-        """Test refreshing branches."""
+        """Test automatic branch refresh on page load."""
         mock_list_branches.return_value = [
             {'name': 'main', 'commit_sha': 'abc123', 'last_commit_date': timezone.now()}
         ]
         
-        response = self.client.post(self.url, {'refresh_branches': 'true'})
-        self.assertEqual(response.status_code, 302)  # Redirect
+        # Branches are now refreshed automatically on GET
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)  # Page loads successfully
         self.assertTrue(Branch.objects.filter(repository=self.repo, name='main').exists())
 
 
@@ -200,6 +213,12 @@ class BranchCommitsViewTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
         self.repo = GitRepository.objects.create(
             name="test-repo",
             url="https://github.com/test/repo.git",
@@ -301,7 +320,8 @@ class ConnectGitHubRepositoryViewTest(TestCase):
         """Test that the view requires login."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('/accounts/login/', response.url)
+        # Now it redirects to GitHub login
+        self.assertIn('/accounts/github/login/', response.url)
     
     @patch('projects.views.SocialToken.objects.get')
     def test_view_redirects_without_github_token(self, mock_social_token):
@@ -315,42 +335,14 @@ class ConnectGitHubRepositoryViewTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse('repository_list'))
     
-    @patch('projects.views.Github')
-    @patch('projects.views.SocialToken.objects.get')
-    def test_view_displays_github_repos(self, mock_social_token, mock_github_class):
-        """Test that GitHub repositories are displayed."""
-        # Mock social token
-        mock_token = MagicMock()
-        mock_token.token = 'fake_token'
-        mock_social_token.return_value = mock_token
-        
-        # Mock GitHub API
-        mock_repo = MagicMock()
-        mock_repo.id = 123
-        mock_repo.name = 'test-repo'
-        mock_repo.full_name = 'testuser/test-repo'
-        mock_repo.description = 'Test repository'
-        mock_repo.clone_url = 'https://github.com/testuser/test-repo.git'
-        mock_repo.default_branch = 'main'
-        mock_repo.private = False
-        
-        # Mock paginated list that supports slicing
-        mock_paginated_list = MagicMock()
-        mock_paginated_list.__getitem__ = MagicMock(return_value=[mock_repo])
-        
-        mock_user = MagicMock()
-        mock_user.get_repos.return_value = mock_paginated_list
-        
-        mock_github = MagicMock()
-        mock_github.get_user.return_value = mock_user
-        mock_github_class.return_value = mock_github
-        
+    def test_view_redirects_on_get(self):
+        """Test that GET requests redirect to repository list."""
         self.client.login(username='testuser', password='testpass')
         response = self.client.get(self.url)
         
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'test-repo')
-        self.assertContains(response, 'testuser/test-repo')
+        # The view now redirects GET requests to repository_list
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('repository_list'))
     
     @patch('projects.views.SocialToken.objects.get')
     def test_connect_repository(self, mock_social_token):

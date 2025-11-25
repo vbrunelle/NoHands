@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block title %}Email Addresses - NoHands{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">
+                <i class="ti ti-mail me-2"></i>
+                Email Addresses
+            </h2>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Your Email Addresses</h3>
+            </div>
+            <div class="card-body">
+                {% if emailaddresses %}
+                <p class="text-muted mb-3">
+                    The following email addresses are associated with your account:
+                </p>
+                <div class="list-group list-group-flush">
+                    {% for emailaddress in emailaddresses %}
+                    <div class="list-group-item">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <div class="d-flex align-items-center">
+                                    <i class="ti ti-mail me-2"></i>
+                                    <div>
+                                        <strong>{{ emailaddress.email }}</strong>
+                                        {% if emailaddress.primary %}
+                                        <span class="badge bg-blue-lt ms-2">Primary</span>
+                                        {% endif %}
+                                        {% if emailaddress.verified %}
+                                        <span class="badge bg-green-lt ms-2">
+                                            <i class="ti ti-check me-1"></i>Verified
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-yellow-lt ms-2">Unverified</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="btn-list">
+                                    {% if not emailaddress.primary and emailaddress.verified %}
+                                    <form method="post" action="{% url 'account_email' %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="primary">
+                                        <input type="hidden" name="email" value="{{ emailaddress.email }}">
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            Make Primary
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if not emailaddress.primary %}
+                                    <form method="post" action="{% url 'account_email' %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="remove">
+                                        <input type="hidden" name="email" value="{{ emailaddress.email }}">
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            Remove
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-mail-off"></i>
+                    </div>
+                    <p class="empty-title">No email addresses</p>
+                    <p class="empty-subtitle text-muted">
+                        Add an email address to your account
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="{% url 'repository_list' %}" class="btn btn-secondary">
+                <i class="ti ti-arrow-left me-2"></i>
+                Back to Repositories
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

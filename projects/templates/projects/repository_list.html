@@ -7,25 +7,20 @@
     <div class="row align-items-center">
         <div class="col">
             <h2 class="page-title">
-                <i class="ti ti-git-branch icon me-2"></i>
+                <i class="ti ti-git-branch me-2"></i>
                 Git Repositories
             </h2>
         </div>
         <div class="col-auto ms-auto d-print-none">
             <div class="btn-list">
-                {% if user.is_authenticated %}
-                    <a href="{% url 'connect_github_repository' %}" class="btn btn-primary">
-                        <i class="ti ti-brand-github icon"></i>
-                        Connect GitHub Repo
-                    </a>
-                {% else %}
+                {% if not user.is_authenticated %}
                     <a href="/accounts/github/login/" class="btn btn-primary">
-                        <i class="ti ti-brand-github icon"></i>
+                        <i class="ti ti-brand-github"></i>
                         Login with GitHub
                     </a>
                 {% endif %}
                 <a href="/admin/projects/gitrepository/add/" class="btn btn-secondary">
-                    <i class="ti ti-plus icon"></i>
+                    <i class="ti ti-plus"></i>
                     Add Manually
                 </a>
             </div>
@@ -33,82 +28,148 @@
     </div>
 </div>
 
-<div class="row row-cards mt-3">
-    {% if repositories %}
-        {% for repo in repositories %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card">
-                <div class="card-body">
-                    <h3 class="card-title">
-                        <i class="ti ti-folder icon me-2"></i>
-                        {{ repo.name }}
-                    </h3>
-                    <div class="mb-3">
-                        <div class="text-muted small mb-1">Repository URL</div>
-                        <code class="small text-truncate d-block" style="max-width: 300px;">{{ repo.url }}</code>
-                    </div>
-                    <div class="mb-3">
-                        <div class="text-muted small mb-1">Default Branch</div>
-                        <span class="badge bg-blue-lt">{{ repo.default_branch }}</span>
-                    </div>
-                    {% if repo.description %}
-                    <div class="mb-3">
-                        <div class="text-muted small">{{ repo.description }}</div>
-                    </div>
-                    {% endif %}
-                    {% if repo.user %}
-                    <div class="mb-3">
-                        <div class="text-muted small">
-                            <i class="ti ti-user icon"></i>
-                            Connected by {{ repo.user.username }}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'repository_detail' repo.id %}" class="btn btn-primary w-100">
-                        <i class="ti ti-eye icon"></i>
-                        View Details
-                    </a>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <div class="empty">
-                        <div class="empty-icon">
-                            <i class="ti ti-folder-off icon"></i>
-                        </div>
-                        <p class="empty-title">No repositories found</p>
-                        <p class="empty-subtitle text-muted">
-                            Get started by connecting a GitHub repository or adding one manually
-                        </p>
-                        <div class="empty-action">
-                            <div class="btn-list">
-                                {% if user.is_authenticated %}
-                                    <a href="{% url 'connect_github_repository' %}" class="btn btn-primary">
-                                        <i class="ti ti-brand-github icon"></i>
-                                        Connect GitHub Repo
-                                    </a>
-                                {% else %}
-                                    <a href="/accounts/github/login/" class="btn btn-primary">
-                                        <i class="ti ti-brand-github icon"></i>
-                                        Login with GitHub
-                                    </a>
-                                {% endif %}
-                                <a href="/admin/projects/gitrepository/add/" class="btn btn-secondary">
-                                    <i class="ti ti-plus icon"></i>
-                                    Add Manually
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% endif %}
+<!-- Available GitHub Repositories Section -->
+{% if available_github_repos %}
+<div class="row mt-3">
+    <div class="col-12">
+        <h3 class="mb-3">
+            <i class="ti ti-brand-github me-2"></i>
+            Available GitHub Repositories
+        </h3>
+    </div>
 </div>
+<div class="row row-cards">
+    {% for repo in available_github_repos %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">
+                    <i class="ti ti-brand-github me-2"></i>
+                    {{ repo.full_name }}
+                </h3>
+                {% if repo.description %}
+                <div class="mb-3">
+                    <div class="text-muted small">{{ repo.description }}</div>
+                </div>
+                {% endif %}
+                <div class="mb-2">
+                    <span class="badge bg-blue-lt">{{ repo.default_branch }}</span>
+                    {% if repo.private %}
+                        <span class="badge bg-red-lt">Private</span>
+                    {% else %}
+                        <span class="badge bg-green-lt">Public</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer">
+                <form method="post" action="{% url 'connect_github_repository' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="repo_id" value="{{ repo.id }}">
+                    <input type="hidden" name="repo_name" value="{{ repo.name }}">
+                    <input type="hidden" name="repo_url" value="{{ repo.clone_url }}">
+                    <input type="hidden" name="repo_description" value="{{ repo.description }}">
+                    <input type="hidden" name="default_branch" value="{{ repo.default_branch }}">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-plug"></i>
+                        Connect Repository
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Connected Repositories Section -->
+{% if repositories %}
+<div class="row mt-4">
+    <div class="col-12">
+        <h3 class="mb-3">
+            <i class="ti ti-folder me-2"></i>
+            Connected Repositories
+        </h3>
+    </div>
+</div>
+<div class="row row-cards">
+    {% for repo in repositories %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">
+                    <i class="ti ti-folder me-2"></i>
+                    {{ repo.name }}
+                </h3>
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Repository URL</div>
+                    <code class="small text-truncate d-block" style="max-width: 300px;">{{ repo.url }}</code>
+                </div>
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Default Branch</div>
+                    <span class="badge bg-blue-lt">{{ repo.default_branch }}</span>
+                </div>
+                {% if repo.description %}
+                <div class="mb-3">
+                    <div class="text-muted small">{{ repo.description }}</div>
+                </div>
+                {% endif %}
+                {% if repo.user %}
+                <div class="mb-3">
+                    <div class="text-muted small">
+                        <i class="ti ti-user"></i>
+                        Connected by {{ repo.user.username }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'repository_detail' repo.id %}" class="btn btn-primary w-100">
+                    <i class="ti ti-eye"></i>
+                    View Details
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Empty State -->
+{% if not repositories and not available_github_repos %}
+<div class="row row-cards mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="ti ti-folder-off"></i>
+                    </div>
+                    <p class="empty-title">No repositories found</p>
+                    <p class="empty-subtitle text-muted">
+                        {% if not has_github_token %}
+                            Login with GitHub to connect your repositories, or add one manually
+                        {% else %}
+                            You don't have any GitHub repositories, or they are all already connected. You can add one manually.
+                        {% endif %}
+                    </p>
+                    <div class="empty-action">
+                        <div class="btn-list">
+                            {% if not user.is_authenticated %}
+                                <a href="/accounts/github/login/" class="btn btn-primary">
+                                    <i class="ti ti-brand-github"></i>
+                                    Login with GitHub
+                                </a>
+                            {% endif %}
+                            <a href="/admin/projects/gitrepository/add/" class="btn btn-secondary">
+                                <i class="ti ti-plus"></i>
+                                Add Manually
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
