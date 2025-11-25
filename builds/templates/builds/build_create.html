@@ -339,6 +339,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
     function renderFileList(files) {
         if (files.length === 0) {
             fileListEl.innerHTML = `
@@ -350,22 +357,25 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const html = files.filter(f => f.type === 'file').map(file => `
-            <div class="list-group-item list-group-item-action cursor-pointer file-item" data-path="${file.path}">
+        const html = files.filter(f => f.type === 'file').map(file => {
+            const escapedPath = escapeHtml(file.path);
+            const escapedSize = escapeHtml(formatFileSize(file.size));
+            return `
+            <div class="list-group-item list-group-item-action cursor-pointer file-item" data-path="${escapedPath}">
                 <div class="row align-items-center">
                     <div class="col-auto">
                         <i class="ti ti-file-code text-muted"></i>
                     </div>
                     <div class="col">
-                        <div class="text-truncate">${file.path}</div>
-                        <small class="text-muted">${formatFileSize(file.size)}</small>
+                        <div class="text-truncate">${escapedPath}</div>
+                        <small class="text-muted">${escapedSize}</small>
                     </div>
                     <div class="col-auto">
                         <i class="ti ti-chevron-right text-muted"></i>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
         
         fileListEl.innerHTML = `<div class="list-group list-group-flush">${html}</div>`;
         

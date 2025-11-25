@@ -232,24 +232,24 @@ def list_files_in_commit(repo_path: Path, sha: str, path_filter: str = '') -> Li
             for item in tree:
                 item_path = f"{prefix}{item.name}" if prefix else item.name
                 
-                # Apply path filter if provided
-                if path_filter and not item_path.startswith(path_filter):
-                    if item.type == 'tree':
-                        traverse_tree(item, f"{item_path}/")
-                    continue
-                
                 if item.type == 'blob':
+                    # Apply path filter for files
+                    if path_filter and not item_path.startswith(path_filter):
+                        continue
                     files.append({
                         'path': item_path,
                         'type': 'file',
                         'size': item.size
                     })
                 elif item.type == 'tree':
-                    files.append({
-                        'path': item_path,
-                        'type': 'directory',
-                        'size': 0
-                    })
+                    # Always recurse into directories to find matching files
+                    # but only add directory to results if it matches filter or no filter
+                    if not path_filter or item_path.startswith(path_filter):
+                        files.append({
+                            'path': item_path,
+                            'type': 'directory',
+                            'size': 0
+                        })
                     traverse_tree(item, f"{item_path}/")
         
         traverse_tree(commit.tree)
