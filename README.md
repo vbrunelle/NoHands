@@ -365,6 +365,65 @@ For production Docker deployments:
 
 5. **Set proper secrets**: Always use strong, unique secret keys in production.
 
+### 📦 Using Pre-built Images from GitHub Container Registry (GHCR)
+
+NoHands images are automatically built and published to GitHub Container Registry when changes are pushed to the `main` branch or when tags are created.
+
+#### Pulling the Image
+
+```bash
+# Pull the latest image from main branch
+docker pull ghcr.io/vbrunelle/nohands:main
+
+# Pull a specific version
+docker pull ghcr.io/vbrunelle/nohands:v1.0.0
+
+# Pull by commit SHA
+docker pull ghcr.io/vbrunelle/nohands:sha-abc1234
+```
+
+#### Running the Pre-built Image
+
+```bash
+docker run -p 8000:8000 \
+  -e DJANGO_SECRET_KEY="your-secret-key" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/vbrunelle/nohands:main
+```
+
+#### 🔐 Private Package Access (Human Actions Required)
+
+If the repository is private, the GHCR package will be private by default. To use private images:
+
+1. **Generate a Personal Access Token (PAT)**:
+   - Go to https://github.com/settings/tokens
+   - Click "Generate new token (classic)"
+   - Select scope: `read:packages`
+   - Copy the generated token
+
+2. **Login to GHCR**:
+   ```bash
+   echo $GITHUB_PAT | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+   ```
+
+3. **Pull the private image**:
+   ```bash
+   docker pull ghcr.io/vbrunelle/nohands:main
+   ```
+
+#### Package Visibility Configuration (Repository Admin)
+
+To manage the package visibility:
+
+1. Navigate to the repository's **Packages** section
+2. Click on the package (e.g., `nohands`)
+3. Go to **Package settings**
+4. Under **Danger Zone**, you can change visibility:
+   - **Private**: Only repository collaborators can access
+   - **Public**: Anyone can pull the image
+
+> **Note**: The GitHub Actions workflow uses `GITHUB_TOKEN` which has automatic `packages:write` permission. No additional secrets configuration is needed for the CI/CD pipeline.
+
 ## 🎯 Quick Start
 
 Let's walk through building your first Docker image with NoHands!
