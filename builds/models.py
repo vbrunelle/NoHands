@@ -2,6 +2,27 @@ from django.db import models
 from projects.models import GitRepository, Commit
 
 
+# Default Dockerfile template for auto-generation
+DEFAULT_DOCKERFILE_TEMPLATE = """# Auto-generated Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt* ./
+RUN pip install --no-cache-dir -r requirements.txt || true
+
+# Copy application code
+COPY . .
+
+# Expose the application port
+EXPOSE 8080
+
+# Default command (customize as needed)
+CMD ["python", "-m", "http.server", "8080"]
+"""
+
+
 class Build(models.Model):
     """
     Represents a build request and its execution status.
@@ -22,6 +43,12 @@ class Build(models.Model):
         ('error', 'Error'),
     ]
 
+    DOCKERFILE_SOURCE_CHOICES = [
+        ('generated', 'Auto-generated'),
+        ('custom', 'Custom Content'),
+        ('repo_file', 'File from Repository'),
+    ]
+
     repository = models.ForeignKey(GitRepository, on_delete=models.CASCADE, related_name='builds')
     commit = models.ForeignKey(Commit, on_delete=models.CASCADE, related_name='builds')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -29,6 +56,25 @@ class Build(models.Model):
     # Build metadata
     branch_name = models.CharField(max_length=255, help_text="Branch name at build time")
     image_tag = models.CharField(max_length=255, blank=True, help_text="Generated Docker image tag")
+    
+    # Dockerfile configuration
+    dockerfile_source = models.CharField(
+        max_length=20, 
+        choices=DOCKERFILE_SOURCE_CHOICES, 
+        default='generated',
+        help_text="Source of the Dockerfile"
+    )
+    dockerfile_content = models.TextField(
+        blank=True,
+        default=DEFAULT_DOCKERFILE_TEMPLATE,
+        help_text="Custom Dockerfile content"
+    )
+    dockerfile_path = models.CharField(
+        max_length=255,
+        blank=True,
+        default='Dockerfile',
+        help_text="Path to Dockerfile in repository"
+    )
     
     # Logs and output
     logs = models.TextField(blank=True, help_text="Build logs")

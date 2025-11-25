@@ -106,6 +106,27 @@
                             <code>{{ build.container_port }}</code>
                         </div>
                     </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Dockerfile Source</div>
+                        <div class="datagrid-content">
+                            {% if build.dockerfile_source == 'generated' %}
+                            <span class="badge bg-blue-lt">
+                                <i class="ti ti-wand me-1"></i>
+                                Auto-generated
+                            </span>
+                            {% elif build.dockerfile_source == 'custom' %}
+                            <span class="badge bg-purple-lt">
+                                <i class="ti ti-edit me-1"></i>
+                                Custom Content
+                            </span>
+                            {% elif build.dockerfile_source == 'repo_file' %}
+                            <span class="badge bg-green-lt">
+                                <i class="ti ti-file me-1"></i>
+                                {{ build.dockerfile_path }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -277,6 +298,28 @@
             </div>
             <div class="card-body">
                 <div class="logs">{{ build.error_message }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if build.dockerfile_content %}
+    <!-- Dockerfile Content Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-file-code me-2"></i>
+                    Dockerfile Content
+                </h3>
+                <div class="card-actions">
+                    <span class="badge bg-{% if build.dockerfile_source == 'generated' %}blue{% elif build.dockerfile_source == 'custom' %}purple{% else %}green{% endif %}-lt">
+                        {{ build.get_dockerfile_source_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <pre class="logs" style="margin: 0;">{{ build.dockerfile_content }}</pre>
             </div>
         </div>
     </div>

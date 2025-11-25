@@ -561,3 +561,146 @@ class DockerUtilsTest(TestCase):
         
         result = stop_container("abc123")
         self.assertTrue(result)
+
+
+class DockerfileConfigurationTest(TestCase):
+    """Tests for Dockerfile configuration functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_build_dockerfile_fields_default(self):
+        """Test that Dockerfile fields have correct defaults."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="pending"
+        )
+        self.assertEqual(build.dockerfile_source, 'generated')
+        self.assertIn('FROM python', build.dockerfile_content)
+        self.assertEqual(build.dockerfile_path, 'Dockerfile')
+    
+    def test_build_with_custom_dockerfile_content(self):
+        """Test creating a build with custom Dockerfile content."""
+        custom_dockerfile = "FROM node:18\nWORKDIR /app\nCOPY . .\nCMD ['npm', 'start']"
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="pending",
+            dockerfile_source='custom',
+            dockerfile_content=custom_dockerfile
+        )
+        self.assertEqual(build.dockerfile_source, 'custom')
+        self.assertEqual(build.dockerfile_content, custom_dockerfile)
+    
+    def test_build_with_repo_file_dockerfile(self):
+        """Test creating a build using a file from the repo as Dockerfile."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="pending",
+            dockerfile_source='repo_file',
+            dockerfile_path='docker/Dockerfile.prod'
+        )
+        self.assertEqual(build.dockerfile_source, 'repo_file')
+        self.assertEqual(build.dockerfile_path, 'docker/Dockerfile.prod')
+    
+    @patch('builds.views.threading.Thread')
+    def test_create_build_with_dockerfile_config(self, mock_thread):
+        """Test creating a build with Dockerfile configuration via POST."""
+        url = reverse('build_create', args=[self.repo.id, self.commit.id])
+        
+        custom_dockerfile = "FROM nginx:alpine\nCOPY . /usr/share/nginx/html"
+        response = self.client.post(url, {
+            'dockerfile_source': 'custom',
+            'dockerfile_content': custom_dockerfile,
+            'container_port': '80'
+        })
+        
+        # Should redirect to build detail
+        self.assertEqual(response.status_code, 302)
+        
+        # Build should be created with custom Dockerfile
+        build = Build.objects.filter(repository=self.repo, commit=self.commit).first()
+        self.assertIsNotNone(build)
+        self.assertEqual(build.dockerfile_source, 'custom')
+        self.assertEqual(build.dockerfile_content, custom_dockerfile)
+        self.assertEqual(build.container_port, 80)
+
+
+class FileListAPITest(TestCase):
+    """Tests for file listing API."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_list_files_url_resolves(self):
+        """Test list files URL resolves correctly."""
+        url = reverse('list_commit_files', args=[1, 1])
+        self.assertEqual(url, '/builds/api/files/1/1/')
+    
+    def test_get_file_content_url_resolves(self):
+        """Test get file content URL resolves correctly."""
+        url = reverse('get_commit_file_content', args=[1, 1])
+        self.assertEqual(url, '/builds/api/file-content/1/1/')
+    
+    def test_get_file_content_missing_path(self):
+        """Test get file content returns error when path is missing."""
+        url = reverse('get_commit_file_content', args=[self.repo.id, self.commit.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error'], 'File path is required')

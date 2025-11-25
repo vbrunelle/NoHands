@@ -9,9 +9,12 @@ import logging
 import threading
 import os
 
-from .models import Build
+from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE
 from projects.models import GitRepository, Commit
-from projects.git_utils import checkout_commit, clone_or_update_repo, GitUtilsError
+from projects.git_utils import (
+    checkout_commit, clone_or_update_repo, GitUtilsError,
+    list_files_in_commit, get_file_content
+)
 from .dagger_pipeline import run_build_sync
 from .docker_utils import (
     start_container, stop_container, remove_container,
@@ -69,6 +72,15 @@ def build_create(request, repo_id, commit_id):
         push_to_registry = request.POST.get('push_to_registry') == 'on'
         container_port = _validate_container_port(request.POST.get('container_port', 8080))
         
+        # Dockerfile configuration
+        dockerfile_source = request.POST.get('dockerfile_source', 'generated')
+        dockerfile_content = request.POST.get('dockerfile_content', DEFAULT_DOCKERFILE_TEMPLATE)
+        dockerfile_path = request.POST.get('dockerfile_path', 'Dockerfile')
+        
+        # Validate dockerfile_source
+        if dockerfile_source not in ['generated', 'custom', 'repo_file']:
+            dockerfile_source = 'generated'
+        
         # Create build record
         build = Build.objects.create(
             repository=repository,
@@ -76,7 +88,10 @@ def build_create(request, repo_id, commit_id):
             branch_name=commit.branch.name if commit.branch else 'unknown',
             status='pending',
             push_to_registry=push_to_registry,
-            container_port=container_port
+            container_port=container_port,
+            dockerfile_source=dockerfile_source,
+            dockerfile_content=dockerfile_content,
+            dockerfile_path=dockerfile_path
         )
         
         # Start build in background thread
@@ -90,7 +105,8 @@ def build_create(request, repo_id, commit_id):
     
     return render(request, 'builds/build_create.html', {
         'repository': repository,
-        'commit': commit
+        'commit': commit,
+        'default_dockerfile': DEFAULT_DOCKERFILE_TEMPLATE
     })
 
 
@@ -224,6 +240,75 @@ def container_logs(request, build_id):
         })
 
 
+@login_required
+def list_commit_files(request, repo_id, commit_id):
+    """
+    List files in a specific commit (JSON API).
+    Used for the file selector in the build create form.
+    """
+    repository = get_object_or_404(GitRepository, id=repo_id)
+    commit = get_object_or_404(Commit, id=commit_id, repository=repository)
+    
+    try:
+        # Clone/update repository to get files
+        repo_cache_path = settings.GIT_CHECKOUT_DIR / 'cache' / repository.name
+        clone_or_update_repo(repository.url, repo_cache_path)
+        
+        # List files in the commit
+        files = list_files_in_commit(repo_cache_path, commit.sha)
+        
+        return JsonResponse({
+            'success': True,
+            'files': files
+        })
+        
+    except GitUtilsError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'files': []
+        })
+
+
+@login_required
+def get_commit_file_content(request, repo_id, commit_id):
+    """
+    Get content of a file at a specific commit (JSON API).
+    Used for loading Dockerfile content from repo.
+    """
+    repository = get_object_or_404(GitRepository, id=repo_id)
+    commit = get_object_or_404(Commit, id=commit_id, repository=repository)
+    
+    file_path = request.GET.get('path', '')
+    if not file_path:
+        return JsonResponse({
+            'success': False,
+            'error': 'File path is required',
+            'content': ''
+        })
+    
+    try:
+        # Clone/update repository to get file
+        repo_cache_path = settings.GIT_CHECKOUT_DIR / 'cache' / repository.name
+        clone_or_update_repo(repository.url, repo_cache_path)
+        
+        # Get file content
+        content = get_file_content(repo_cache_path, commit.sha, file_path)
+        
+        return JsonResponse({
+            'success': True,
+            'content': content,
+            'path': file_path
+        })
+        
+    except GitUtilsError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'content': ''
+        })
+
+
 def execute_build(build_id: int):
     """
     Execute a build in the background.
@@ -245,6 +330,21 @@ def execute_build(build_id: int):
         checkout_path = settings.GIT_CHECKOUT_DIR / 'builds' / f"build_{build.id}"
         checkout_commit(repo_cache_path, build.commit.sha, checkout_path)
         
+        # Determine Dockerfile path and handle custom content
+        dockerfile_path = 'Dockerfile'
+        
+        if build.dockerfile_source == 'generated' or build.dockerfile_source == 'custom':
+            # Write custom Dockerfile content to the checkout directory
+            custom_dockerfile_path = checkout_path / 'Dockerfile'
+            with open(custom_dockerfile_path, 'w') as f:
+                f.write(build.dockerfile_content)
+            dockerfile_path = 'Dockerfile'
+            logger.info(f"Using custom Dockerfile content for build #{build.id}")
+        elif build.dockerfile_source == 'repo_file':
+            # Use specified file from repo as Dockerfile
+            dockerfile_path = build.dockerfile_path
+            logger.info(f"Using repository file '{dockerfile_path}' as Dockerfile for build #{build.id}")
+        
         # Generate image tag
         image_name = build.repository.name.lower().replace(' ', '-')
         image_tag = f"{build.commit.sha[:8]}"
@@ -252,7 +352,7 @@ def execute_build(build_id: int):
         # Run Dagger build
         result = run_build_sync(
             source_dir=checkout_path,
-            dockerfile_path=build.repository.dockerfile_path,
+            dockerfile_path=dockerfile_path,
             image_name=image_name,
             image_tag=image_tag,
             push_to_registry=build.push_to_registry,

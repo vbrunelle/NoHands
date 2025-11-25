@@ -200,3 +200,105 @@ def get_repository_info(repo_path: Path) -> Dict[str, str]:
         }
     except Exception as e:
         raise GitUtilsError(f"Failed to get repository info: {e}")
+
+
+def list_files_in_commit(repo_path: Path, sha: str, path_filter: str = '') -> List[Dict[str, str]]:
+    """
+    List all files in a specific commit.
+    
+    Args:
+        repo_path: Path to the Git repository
+        sha: Commit SHA
+        path_filter: Optional path prefix to filter files
+        
+    Returns:
+        List of dictionaries with file information (path, type)
+        
+    Raises:
+        GitUtilsError: If listing files fails
+    """
+    try:
+        repo = Repo(repo_path)
+        
+        # Get the commit
+        try:
+            commit = repo.commit(sha)
+        except Exception:
+            raise GitUtilsError(f"Commit '{sha}' not found")
+        
+        files = []
+        
+        def traverse_tree(tree, prefix=''):
+            for item in tree:
+                item_path = f"{prefix}{item.name}" if prefix else item.name
+                
+                # Apply path filter if provided
+                if path_filter and not item_path.startswith(path_filter):
+                    if item.type == 'tree':
+                        traverse_tree(item, f"{item_path}/")
+                    continue
+                
+                if item.type == 'blob':
+                    files.append({
+                        'path': item_path,
+                        'type': 'file',
+                        'size': item.size
+                    })
+                elif item.type == 'tree':
+                    files.append({
+                        'path': item_path,
+                        'type': 'directory',
+                        'size': 0
+                    })
+                    traverse_tree(item, f"{item_path}/")
+        
+        traverse_tree(commit.tree)
+        
+        # Sort files by path
+        files.sort(key=lambda x: x['path'])
+        
+        return files
+    except GitUtilsError:
+        raise
+    except Exception as e:
+        raise GitUtilsError(f"Failed to list files in commit: {e}")
+
+
+def get_file_content(repo_path: Path, sha: str, file_path: str) -> str:
+    """
+    Get the content of a file at a specific commit.
+    
+    Args:
+        repo_path: Path to the Git repository
+        sha: Commit SHA
+        file_path: Path to the file in the repository
+        
+    Returns:
+        File content as string
+        
+    Raises:
+        GitUtilsError: If getting file content fails
+    """
+    try:
+        repo = Repo(repo_path)
+        
+        # Get the commit
+        try:
+            commit = repo.commit(sha)
+        except Exception:
+            raise GitUtilsError(f"Commit '{sha}' not found")
+        
+        # Get the file blob
+        try:
+            blob = commit.tree / file_path
+        except KeyError:
+            raise GitUtilsError(f"File '{file_path}' not found in commit '{sha[:8]}'")
+        
+        # Return content as string
+        return blob.data_stream.read().decode('utf-8')
+    except GitUtilsError:
+        raise
+    except UnicodeDecodeError:
+        raise GitUtilsError(f"File '{file_path}' is not a text file")
+    except Exception as e:
+        raise GitUtilsError(f"Failed to get file content: {e}")
