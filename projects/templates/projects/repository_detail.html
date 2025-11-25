@@ -8,12 +8,12 @@
         <div class="col">
             <div class="page-pretitle">
                 <a href="{% url 'repository_list' %}" class="text-muted">
-                    <i class="ti ti-arrow-left icon me-1"></i>
+                    <i class="ti ti-arrow-left me-1"></i>
                     Back to repositories
                 </a>
             </div>
             <h2 class="page-title">
-                <i class="ti ti-folder icon me-2"></i>
+                <i class="ti ti-folder me-2"></i>
                 {{ repository.name }}
             </h2>
         </div>
@@ -43,7 +43,7 @@
                         <div class="mb-3">
                             <div class="text-muted small mb-1">Status</div>
                             <span class="badge bg-green-lt">
-                                <i class="ti ti-check icon"></i>
+                                <i class="ti ti-check"></i>
                                 Active
                             </span>
                         </div>
@@ -64,7 +64,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="ti ti-git-branch icon me-2"></i>
+                    <i class="ti ti-git-branch me-2"></i>
                     Branches
                 </h3>
             </div>
@@ -82,7 +82,7 @@
                         {% for branch in branches %}
                         <tr>
                             <td>
-                                <i class="ti ti-git-branch icon text-muted me-2"></i>
+                                <i class="ti ti-git-branch text-muted me-2"></i>
                                 <strong>{{ branch.name }}</strong>
                             </td>
                             <td>
@@ -90,7 +90,7 @@
                             </td>
                             <td class="text-end">
                                 <a href="{% url 'branch_commits' repository.id branch.id %}" class="btn btn-sm btn-primary">
-                                    <i class="ti ti-list icon"></i>
+                                    <i class="ti ti-list"></i>
                                     View Commits
                                 </a>
                             </td>
@@ -103,7 +103,7 @@
             <div class="card-body">
                 <div class="empty">
                     <div class="empty-icon">
-                        <i class="ti ti-git-branch icon"></i>
+                        <i class="ti ti-git-branch"></i>
                     </div>
                     <p class="empty-title">No branches found</p>
                     <p class="empty-subtitle text-muted">
@@ -120,7 +120,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="ti ti-git-commit icon me-2"></i>
+                    <i class="ti ti-git-commit me-2"></i>
                     Recent Commits
                 </h3>
             </div>
@@ -141,7 +141,7 @@
                             <td><code class="small">{{ commit.sha|slice:":8" }}</code></td>
                             <td>{{ commit.message|truncatewords:10 }}</td>
                             <td>
-                                <i class="ti ti-user icon text-muted me-1"></i>
+                                <i class="ti ti-user text-muted me-1"></i>
                                 {{ commit.author }}
                             </td>
                             <td class="text-muted">{{ commit.committed_at|date:"Y-m-d H:i" }}</td>
@@ -154,7 +154,7 @@
             <div class="card-body">
                 <div class="empty">
                     <div class="empty-icon">
-                        <i class="ti ti-git-commit icon"></i>
+                        <i class="ti ti-git-commit"></i>
                     </div>
                     <p class="empty-title">No commits available</p>
                     <p class="empty-subtitle text-muted">

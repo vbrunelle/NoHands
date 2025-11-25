@@ -8,24 +8,24 @@
         <div class="col">
             <div class="page-pretitle">
                 <a href="{% url 'build_list' %}" class="text-muted">
-                    <i class="ti ti-arrow-left icon me-1"></i>
+                    <i class="ti ti-arrow-left me-1"></i>
                     Back to builds
                 </a>
             </div>
             <h2 class="page-title">
-                <i class="ti ti-box icon me-2"></i>
+                <i class="ti ti-box me-2"></i>
                 Build #{{ build.id }}
                 <span class="badge badge-{{ build.status }} ms-2">
                     {% if build.status == 'pending' %}
-                    <i class="ti ti-clock icon"></i>
+                    <i class="ti ti-clock"></i>
                     {% elif build.status == 'running' %}
-                    <i class="ti ti-loader icon"></i>
+                    <i class="ti ti-loader"></i>
                     {% elif build.status == 'success' %}
-                    <i class="ti ti-check icon"></i>
+                    <i class="ti ti-check"></i>
                     {% elif build.status == 'failed' %}
-                    <i class="ti ti-x icon"></i>
+                    <i class="ti ti-x"></i>
                     {% elif build.status == 'cancelled' %}
-                    <i class="ti ti-ban icon"></i>
+                    <i class="ti ti-ban"></i>
                     {% endif %}
                     {{ build.get_status_display }}
                 </span>
@@ -34,7 +34,7 @@
         {% if build.status == 'pending' or build.status == 'running' %}
         <div class="col-auto ms-auto d-print-none">
             <button onclick="window.location.reload()" class="btn btn-primary">
-                <i class="ti ti-refresh icon"></i>
+                <i class="ti ti-refresh"></i>
                 Refresh
             </button>
         </div>
@@ -54,7 +54,7 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">Repository</div>
                         <div class="datagrid-content">
-                            <i class="ti ti-folder icon text-muted me-1"></i>
+                            <i class="ti ti-folder text-muted me-1"></i>
                             {{ build.repository.name }}
                         </div>
                     </div>
@@ -62,7 +62,7 @@
                         <div class="datagrid-title">Branch</div>
                         <div class="datagrid-content">
                             <span class="badge bg-blue-lt">
-                                <i class="ti ti-git-branch icon"></i>
+                                <i class="ti ti-git-branch"></i>
                                 {{ build.branch_name }}
                             </span>
                         </div>
@@ -92,7 +92,7 @@
                         <div class="datagrid-content">
                             {% if build.push_to_registry %}
                             <span class="badge bg-green-lt">
-                                <i class="ti ti-check icon"></i>
+                                <i class="ti ti-check"></i>
                                 Yes
                             </span>
                             {% else %}
@@ -116,7 +116,7 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">Created</div>
                         <div class="datagrid-content">
-                            <i class="ti ti-clock icon text-muted me-1"></i>
+                            <i class="ti ti-clock text-muted me-1"></i>
                             {{ build.created_at|date:"Y-m-d H:i:s" }}
                         </div>
                     </div>
@@ -124,7 +124,7 @@
                         <div class="datagrid-title">Started</div>
                         <div class="datagrid-content">
                             {% if build.started_at %}
-                            <i class="ti ti-player-play icon text-muted me-1"></i>
+                            <i class="ti ti-player-play text-muted me-1"></i>
                             {{ build.started_at|date:"Y-m-d H:i:s" }}
                             {% else %}
                             <span class="text-muted">N/A</span>
@@ -135,7 +135,7 @@
                         <div class="datagrid-title">Completed</div>
                         <div class="datagrid-content">
                             {% if build.completed_at %}
-                            <i class="ti ti-flag icon text-muted me-1"></i>
+                            <i class="ti ti-flag text-muted me-1"></i>
                             {{ build.completed_at|date:"Y-m-d H:i:s" }}
                             {% else %}
                             <span class="text-muted">N/A</span>
@@ -159,7 +159,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title text-danger">
-                    <i class="ti ti-alert-circle icon me-2"></i>
+                    <i class="ti ti-alert-circle me-2"></i>
                     Error Message
                 </h3>
             </div>
@@ -176,7 +176,7 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    <i class="ti ti-terminal icon me-2"></i>
+                    <i class="ti ti-terminal me-2"></i>
                     Build Logs
                 </h3>
             </div>
@@ -195,7 +195,7 @@
                 <div class="alert alert-info mb-0">
                     <div class="d-flex">
                         <div>
-                            <i class="ti ti-info-circle icon alert-icon"></i>
+                            <i class="ti ti-info-circle alert-icon"></i>
                         </div>
                         <div>
                             <h4 class="alert-title">Build {{ build.status }}</h4>
