@@ -4,7 +4,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-secret-key-change-in-production}
+      # Required: Set a secure secret key (minimum 50 characters)
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env file or environment}
       - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
@@ -14,7 +15,11 @@ services:
       - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD:-}
       - MAX_CONCURRENT_BUILDS=${MAX_CONCURRENT_BUILDS:-1}
     volumes:
+      # Persist application data (database and git checkout cache)
       - nohands_data:/app
+      # WARNING: Docker socket mounting provides root-level access to the host.
+      # This is required for Dagger to build Docker images.
+      # Only use in trusted environments.
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
