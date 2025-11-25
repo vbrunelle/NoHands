@@ -395,20 +395,7 @@ docker run -p 8000:8000 \
 
 A `docker-compose.yml` file is included in the repository to easily start the application using the pre-built GHCR image.
 
-**Required**: Create a `.env` file with at least the `DJANGO_SECRET_KEY`:
-
-```bash
-# .env (required)
-DJANGO_SECRET_KEY=your-long-random-secret-key-minimum-50-characters
-
-# Optional settings
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,yourdomain.com
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-```
-
-Then start the application:
+Start the application:
 
 ```bash
 # Start the application
@@ -419,6 +406,17 @@ docker compose logs -f
 
 # Stop the application
 docker compose down
+```
+
+Optionally, create a `.env` file for custom configuration:
+
+```bash
+# .env (optional - for production deployments)
+DJANGO_SECRET_KEY=your-long-random-secret-key-minimum-50-characters
+DJANGO_DEBUG=False
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,yourdomain.com
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
 ```
 
 > **⚠️ Security Note**: The Docker socket is mounted to allow Dagger to build Docker images. This provides root-level access to the host system. Only use in trusted environments.

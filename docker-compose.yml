@@ -4,8 +4,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Required: Set a secure secret key (minimum 50 characters)
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env file or environment}
+      # Optional: Override the default Django secret key for production deployments
+      # The app has a built-in default key suitable for development/testing
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-}
       - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
