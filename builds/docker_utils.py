@@ -48,6 +48,7 @@ def start_container(
     host_port: Optional[int] = None,
     container_name: Optional[str] = None,
     max_retries: int = 3,
+    env_vars: Optional[dict] = None,
 ) -> Tuple[str, int]:
     """
     Start a Docker container from the given image.
@@ -58,6 +59,7 @@ def start_container(
         host_port: Host port to map to (if None, an available port will be found)
         container_name: Optional name for the container
         max_retries: Maximum number of retry attempts if port is taken
+        env_vars: Optional dictionary of environment variables to pass to the container
         
     Returns:
         Tuple of (container_id, host_port)
@@ -76,6 +78,11 @@ def start_container(
                 '-d',  # Detached mode
                 '-p', f'{current_port}:{container_port}',
             ]
+            
+            # Add environment variables if provided
+            if env_vars:
+                for key, value in env_vars.items():
+                    cmd.extend(['-e', f'{key}={value}'])
             
             if container_name:
                 # Add attempt number to avoid name conflicts on retry

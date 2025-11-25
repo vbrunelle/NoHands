@@ -151,11 +151,23 @@ def start_build_container(request, build_id):
         build.container_status = 'starting'
         build.save()
         
+        # Get NoHands URL to configure CSRF trusted origins
+        # Build absolute URI to get the scheme, host and port
+        nohands_url = request.build_absolute_uri('/')
+        # Remove trailing slash and get base URL
+        nohands_base = nohands_url.rstrip('/')
+        
+        # Prepare environment variables for the container
+        env_vars = {
+            'CSRF_TRUSTED_ORIGINS': nohands_base,
+        }
+        
         container_name = f"nohands-build-{build.id}"
         container_id, host_port = start_container(
             image_tag=image_tag,
             container_port=build.container_port,
-            container_name=container_name
+            container_name=container_name,
+            env_vars=env_vars,
         )
         
         build.container_id = container_id
@@ -443,8 +455,15 @@ def proxy_to_container(request, build_id, path=''):
         # Exclude NoHands-specific cookies to avoid session conflicts
         headers = {
             key: value for key, value in request.headers.items()
-            if key.lower() not in ['host', 'connection', 'cookie']
+            if key.lower() not in ['host', 'connection', 'cookie', 'referer', 'origin']
         }
+        
+        # Set proper headers for CSRF validation in the container
+        # Django checks that Origin/Referer match the Host
+        headers['Host'] = f"127.0.0.1:{build.host_port}"
+        if request.method == 'POST':
+            headers['Referer'] = f"http://127.0.0.1:{build.host_port}/"
+            headers['Origin'] = f"http://127.0.0.1:{build.host_port}"
         
         # Extract and forward only non-NoHands cookies to the container
         if 'Cookie' in request.headers:
