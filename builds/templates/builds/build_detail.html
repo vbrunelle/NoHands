@@ -235,6 +235,14 @@
                             <strong>Container ID:</strong> <code id="container-id-display">{{ build.container_id|slice:":12" }}</code>
                         </div>
                         {% endif %}
+                        {% if build.container_status == 'running' and build.container_url %}
+                        <div class="mb-2">
+                            <strong>Application URL:</strong> 
+                            <a href="{{ build.container_url }}" target="_blank" class="text-primary">
+                                <i class="ti ti-external-link me-1"></i>{{ build.container_url }}
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6 text-end">
                         {% if build.container_status == 'running' %}
