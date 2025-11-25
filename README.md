@@ -391,6 +391,32 @@ docker run -p 8000:8000 \
   ghcr.io/vbrunelle/nohands:main
 ```
 
+#### Docker Compose with GHCR Image
+
+A `docker-compose.yml` file is included in the repository to easily start the application using the pre-built GHCR image:
+
+```bash
+# Start the application
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop the application
+docker compose down
+```
+
+To customize the configuration, create a `.env` file in the project root:
+
+```bash
+# .env
+DJANGO_SECRET_KEY=your-long-random-secret-key-minimum-50-characters
+DJANGO_DEBUG=False
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,yourdomain.com
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+```
+
 #### 🔐 Private Package Access (Human Actions Required)
 
 If the repository is private, the GHCR package will be private by default. To use private images:

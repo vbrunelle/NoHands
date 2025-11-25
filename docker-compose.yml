@@ -1,0 +1,22 @@
+services:
+  nohands:
+    image: ghcr.io/vbrunelle/nohands:main
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-secret-key-change-in-production}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
+      - DOCKER_REGISTRY_USERNAME=${DOCKER_REGISTRY_USERNAME:-}
+      - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD:-}
+      - MAX_CONCURRENT_BUILDS=${MAX_CONCURRENT_BUILDS:-1}
+    volumes:
+      - nohands_data:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  nohands_data:
