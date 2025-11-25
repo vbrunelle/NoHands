@@ -331,3 +331,233 @@ class URLRoutingTest(TestCase):
         """Test build create URL resolves correctly."""
         url = reverse('build_create', args=[1, 1])
         self.assertEqual(url, '/builds/create/1/1/')
+    
+    def test_start_container_url_resolves(self):
+        """Test start container URL resolves correctly."""
+        url = reverse('start_build_container', args=[1])
+        self.assertEqual(url, '/builds/1/start-container/')
+    
+    def test_stop_container_url_resolves(self):
+        """Test stop container URL resolves correctly."""
+        url = reverse('stop_build_container', args=[1])
+        self.assertEqual(url, '/builds/1/stop-container/')
+    
+    def test_container_logs_url_resolves(self):
+        """Test container logs URL resolves correctly."""
+        url = reverse('container_logs', args=[1])
+        self.assertEqual(url, '/builds/1/container-logs/')
+
+
+class BuildModelExtendedTest(TestCase):
+    """Extended tests for Build model with container fields."""
+    
+    def setUp(self):
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_container_fields_default(self):
+        """Test container fields have correct defaults."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="pending"
+        )
+        self.assertEqual(build.container_port, 8080)
+        self.assertIsNone(build.host_port)
+        self.assertEqual(build.container_id, '')
+        self.assertEqual(build.container_status, 'none')
+    
+    def test_container_url_property_running(self):
+        """Test container_url property when container is running."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="running",
+            host_port=8080
+        )
+        self.assertEqual(build.container_url, "http://localhost:8080")
+    
+    def test_container_url_property_not_running(self):
+        """Test container_url property when container is not running."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_status="stopped"
+        )
+        self.assertEqual(build.container_url, "")
+
+
+class ContainerViewsTest(TestCase):
+    """Tests for container control views."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+        self.build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            image_tag="test-repo:abc123de"
+        )
+    
+    def test_start_container_get_redirects(self):
+        """Test that GET request redirects to build detail."""
+        url = reverse('start_build_container', args=[self.build.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+    
+    def test_start_container_failed_build(self):
+        """Test that container cannot be started for failed build."""
+        self.build.status = 'failed'
+        self.build.save()
+        
+        url = reverse('start_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify container status unchanged
+        self.build.refresh_from_db()
+        self.assertEqual(self.build.container_status, 'none')
+    
+    def test_stop_container_get_redirects(self):
+        """Test that GET request redirects to build detail."""
+        url = reverse('stop_build_container', args=[self.build.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+    
+    def test_stop_container_no_container(self):
+        """Test stopping when no container is running."""
+        url = reverse('stop_build_container', args=[self.build.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+    
+    def test_container_logs_no_container(self):
+        """Test getting logs when no container is running."""
+        url = reverse('container_logs', args=[self.build.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error'], 'No container running')
+
+
+class DockerUtilsTest(TestCase):
+    """Tests for Docker utilities."""
+    
+    def test_find_available_port(self):
+        """Test finding an available port."""
+        from builds.docker_utils import find_available_port
+        
+        port = find_available_port(start_port=49000)
+        self.assertIsInstance(port, int)
+        self.assertGreaterEqual(port, 49000)
+        self.assertLess(port, 49100)
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_get_container_logs(self, mock_run):
+        """Test getting container logs."""
+        from builds.docker_utils import get_container_logs
+        
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="Log line 1\nLog line 2",
+            stderr=""
+        )
+        
+        logs = get_container_logs("abc123", tail=100)
+        self.assertIn("Log line 1", logs)
+        mock_run.assert_called_once()
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_get_container_status(self, mock_run):
+        """Test getting container status."""
+        from builds.docker_utils import get_container_status
+        
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="running\n"
+        )
+        
+        status = get_container_status("abc123")
+        self.assertEqual(status, "running")
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_start_container_success(self, mock_run):
+        """Test starting a container."""
+        from builds.docker_utils import start_container
+        
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="abc123def456\n"
+        )
+        
+        container_id, host_port = start_container(
+            image_tag="test:latest",
+            container_port=8080,
+            host_port=9000
+        )
+        
+        self.assertEqual(container_id, "abc123def456")
+        self.assertEqual(host_port, 9000)
+    
+    @patch('builds.docker_utils.subprocess.run')
+    def test_stop_container_success(self, mock_run):
+        """Test stopping a container."""
+        from builds.docker_utils import stop_container
+        
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="abc123\n"
+        )
+        
+        result = stop_container("abc123")
+        self.assertTrue(result)

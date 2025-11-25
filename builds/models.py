@@ -14,6 +14,14 @@ class Build(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
+    CONTAINER_STATUS_CHOICES = [
+        ('none', 'Not Started'),
+        ('starting', 'Starting'),
+        ('running', 'Running'),
+        ('stopped', 'Stopped'),
+        ('error', 'Error'),
+    ]
+
     repository = models.ForeignKey(GitRepository, on_delete=models.CASCADE, related_name='builds')
     commit = models.ForeignKey(Commit, on_delete=models.CASCADE, related_name='builds')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -34,6 +42,12 @@ class Build(models.Model):
     # Build configuration
     push_to_registry = models.BooleanField(default=False, help_text="Whether to push image to registry")
     deploy_after_build = models.BooleanField(default=False, help_text="Whether to deploy after successful build")
+    
+    # Container configuration
+    container_port = models.IntegerField(default=8080, help_text="Port to expose from the container")
+    host_port = models.IntegerField(null=True, blank=True, help_text="Host port mapped to container port")
+    container_id = models.CharField(max_length=64, blank=True, help_text="Docker container ID when running")
+    container_status = models.CharField(max_length=20, choices=CONTAINER_STATUS_CHOICES, default='none')
 
     class Meta:
         verbose_name = "Build"
@@ -52,4 +66,11 @@ class Build(models.Model):
             minutes, seconds = divmod(total_seconds, 60)
             return f"{minutes}m {seconds}s"
         return "N/A"
+
+    @property
+    def container_url(self) -> str:
+        """Return the URL to access the running container."""
+        if self.container_status == 'running' and self.host_port:
+            return f"http://localhost:{self.host_port}"
+        return ""
 

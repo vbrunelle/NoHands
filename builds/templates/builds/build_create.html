@@ -77,6 +77,17 @@
                         </label>
                     </div>
                     
+                    <div class="mb-3">
+                        <label class="form-label" for="container_port">
+                            <strong>Container Port</strong>
+                        </label>
+                        <input type="number" class="form-control" id="container_port" name="container_port" 
+                               value="8080" min="1" max="65535" placeholder="8080">
+                        <small class="form-hint">
+                            The port exposed by the application inside the container. This port will be mapped to an available host port when running the container.
+                        </small>
+                    </div>
+                    
                     <div class="mt-4">
                         <button type="submit" class="btn btn-success">
                             <i class="ti ti-rocket"></i>
@@ -133,8 +144,19 @@
                                 <span class="badge bg-purple text-white"></span>
                             </div>
                             <div class="col text-truncate">
+                                <div class="text-reset d-block">Run container after build</div>
+                                <div class="d-block text-muted text-truncate mt-n1">Access your app via URL</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span class="badge bg-orange text-white"></span>
+                            </div>
+                            <div class="col text-truncate">
                                 <div class="text-reset d-block">View real-time logs</div>
-                                <div class="d-block text-muted text-truncate mt-n1">Monitor build progress</div>
+                                <div class="d-block text-muted text-truncate mt-n1">Monitor container output</div>
                             </div>
                         </div>
                     </div>

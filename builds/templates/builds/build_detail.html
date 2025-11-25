@@ -100,6 +100,12 @@
                             {% endif %}
                         </div>
                     </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Container Port</div>
+                        <div class="datagrid-content">
+                            <code>{{ build.container_port }}</code>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -152,6 +158,114 @@
             </div>
         </div>
     </div>
+    
+    {% if build.status == 'success' %}
+    <!-- Container Control Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-container me-2"></i>
+                    Container
+                </h3>
+                <div class="card-actions">
+                    {% if build.container_status == 'running' %}
+                    <span class="badge bg-green-lt me-2">
+                        <i class="ti ti-player-play"></i>
+                        Running
+                    </span>
+                    {% elif build.container_status == 'stopped' %}
+                    <span class="badge bg-gray-lt me-2">
+                        <i class="ti ti-player-stop"></i>
+                        Stopped
+                    </span>
+                    {% elif build.container_status == 'error' %}
+                    <span class="badge bg-red-lt me-2">
+                        <i class="ti ti-alert-circle"></i>
+                        Error
+                    </span>
+                    {% elif build.container_status == 'starting' %}
+                    <span class="badge bg-yellow-lt me-2">
+                        <i class="ti ti-loader"></i>
+                        Starting
+                    </span>
+                    {% else %}
+                    <span class="badge bg-gray-lt me-2">
+                        <i class="ti ti-player-stop"></i>
+                        Not Started
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="mb-2">
+                            <strong>Container Port:</strong> {{ build.container_port }}
+                            {% if build.host_port %}
+                            <i class="ti ti-arrow-right mx-1"></i>
+                            <strong>Host Port:</strong> {{ build.host_port }}
+                            {% endif %}
+                        </div>
+                        {% if build.container_id %}
+                        <div class="mb-2">
+                            <strong>Container ID:</strong> <code>{{ build.container_id|slice:":12" }}</code>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 text-end">
+                        {% if build.container_status == 'running' %}
+                        <a href="{{ build.container_url }}" target="_blank" class="btn btn-success me-2">
+                            <i class="ti ti-external-link"></i>
+                            Open Application
+                        </a>
+                        <form action="{% url 'stop_build_container' build.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="ti ti-player-stop"></i>
+                                Stop Container
+                            </button>
+                        </form>
+                        {% else %}
+                        <form action="{% url 'start_build_container' build.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success">
+                                <i class="ti ti-player-play"></i>
+                                Start Container
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if build.container_status == 'running' %}
+    <!-- Container Logs Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-file-text me-2"></i>
+                    Container Logs (Live)
+                </h3>
+                <div class="card-actions">
+                    <label class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="auto-refresh-logs" checked>
+                        <span class="form-check-label">Auto-refresh</span>
+                    </label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="logs" id="container-logs" style="max-height: 400px; overflow-y: auto;">
+                    <span class="text-muted">Loading logs...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
     
     {% if build.error_message %}
     <!-- Error Message Card -->
@@ -208,4 +322,58 @@
     </div>
     {% endif %}
 </div>
+
+{% if build.container_status == 'running' %}
+<script>
+    // Auto-refresh container logs
+    let refreshInterval = null;
+    const logsContainer = document.getElementById('container-logs');
+    const autoRefreshCheckbox = document.getElementById('auto-refresh-logs');
+    
+    function fetchLogs() {
+        fetch('{% url "container_logs" build.id %}?tail=200')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.logs) {
+                    logsContainer.textContent = data.logs;
+                    // Auto-scroll to bottom
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                } else if (!data.success) {
+                    logsContainer.innerHTML = '<span class="text-muted">' + (data.error || 'Failed to load logs') + '</span>';
+                    // Stop auto-refresh if container is not running
+                    if (refreshInterval) {
+                        clearInterval(refreshInterval);
+                        refreshInterval = null;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching logs:', error);
+            });
+    }
+    
+    function startAutoRefresh() {
+        fetchLogs();
+        refreshInterval = setInterval(fetchLogs, 3000);
+    }
+    
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+        }
+    }
+    
+    autoRefreshCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    // Start auto-refresh on page load
+    startAutoRefresh();
+</script>
+{% endif %}
 {% endblock %}
