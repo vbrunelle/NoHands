@@ -138,9 +138,10 @@ class NoHandsLoginCSRFTest(TestCase):
         """Vérifie que le cookie CSRF est bien défini sur la page de login."""
         response = self.client.get('/accounts/github/login/')
         
-        self.assertIn('csrftoken', response.cookies)
+        # Le cookie utilise le nom personnalisé 'nohands_csrftoken'
+        self.assertIn('nohands_csrftoken', response.cookies)
         
-        cookie = response.cookies['csrftoken']
+        cookie = response.cookies['nohands_csrftoken']
         print(f"✅ Cookie CSRF défini: {cookie.value[:20]}...")
         print(f"   Path: {cookie.get('path', '/')}")
         print(f"   SameSite: {cookie.get('samesite', 'not set')}")

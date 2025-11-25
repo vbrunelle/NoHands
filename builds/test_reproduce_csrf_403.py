@@ -99,12 +99,17 @@ class ReproduceCSRF403ErrorTest(TestCase):
         print("="*70)
 
     
-    def test_csrf_fails_when_cookie_missing(self):
+    def test_csrf_security_validates_cookie_presence(self):
         """
-        Autre tentative: POST sans cookie du tout.
+        Test de sécurité: POST sans cookie CSRF doit être rejeté.
+        
+        Ce test VALIDE que la sécurité CSRF fonctionne correctement:
+        un POST sans cookie CSRF doit être rejeté avec 403.
+        
+        C'est le comportement ATTENDU pour la sécurité.
         """
         print("\n" + "="*70)
-        print(" TEST: CSRF sans cookie du tout ")
+        print(" TEST SÉCURITÉ: CSRF rejette POST sans cookie ")
         print("="*70)
         
         client = Client(enforce_csrf_checks=True)
@@ -120,31 +125,34 @@ class ReproduceCSRF403ErrorTest(TestCase):
         
         print(f"    Token: {csrf_token[:20]}...")
         
-        # SUPPRIMER TOUS LES COOKIES
-        print("\n    Suppression de TOUS les cookies CSRF")
+        # SUPPRIMER TOUS LES COOKIES (simule une attaque CSRF)
+        print("\n    Suppression de TOUS les cookies CSRF (attaque simulée)")
         client.cookies.clear()
         
-        # POST sans cookie
+        # POST sans cookie - DOIT échouer pour la sécurité
         print(f"    POST sans aucun cookie CSRF")
         response = client.post('/accounts/github/login/', data={'csrfmiddlewaretoken': csrf_token})
         
         print(f"    Status: {response.status_code}")
         
-        if response.status_code == 403:
-            print("\n" + "!"*70)
-            print(" ✅ ERREUR 403 REPRODUITE!")
-            print(" Django rejette la requête car aucun cookie CSRF n'est présent")
-            print("!"*70)
-            self.fail("ERREUR 403: Aucun cookie CSRF - problème reproduit!")
-        
+        # VALIDATION: Une attaque CSRF DOIT être rejetée avec 403
+        self.assertEqual(response.status_code, 403, 
+            "La sécurité CSRF devrait rejeter un POST sans cookie!"
+        )
+        print("    ✅ Sécurité validée: POST sans cookie correctement rejeté")
         print("="*70)
     
-    def test_csrf_with_mismatched_token_and_cookie(self):
+    def test_csrf_security_validates_token_match(self):
         """
-        Tester si le token et le cookie ne correspondent pas.
+        Test de sécurité: POST avec token != cookie doit être rejeté.
+        
+        Ce test VALIDE que la sécurité CSRF fonctionne correctement:
+        un POST où le token ne correspond pas au cookie doit être rejeté avec 403.
+        
+        C'est le comportement ATTENDU pour la sécurité.
         """
         print("\n" + "="*70)
-        print(" TEST: Token et cookie différents ")
+        print(" TEST SÉCURITÉ: CSRF rejette token invalide ")
         print("="*70)
         
         client = Client(enforce_csrf_checks=True)
@@ -159,21 +167,19 @@ class ReproduceCSRF403ErrorTest(TestCase):
         
         print(f"    Token du formulaire: {csrf_token[:20]}...")
         
-        # Changer le cookie pour un autre valeur
-        print("\n    Modification du cookie pour ne pas correspondre au token")
+        # Changer le cookie pour un autre valeur (simule une attaque)
+        print("\n    Modification du cookie (attaque simulée)")
         client.cookies['nohands_csrftoken'] = 'DIFFERENT_VALUE_123456789'
         
-        # POST avec token != cookie
-        print(f"    POST avec token={csrf_token[:20]}... et cookie=DIFFERENT_VALUE...")
+        # POST avec token != cookie - DOIT échouer pour la sécurité
+        print(f"    POST avec token valide mais cookie modifié")
         response = client.post('/accounts/github/login/', data={'csrfmiddlewaretoken': csrf_token})
         
         print(f"    Status: {response.status_code}")
         
-        if response.status_code == 403:
-            print("\n" + "!"*70)
-            print(" ✅ ERREUR 403 REPRODUITE!")
-            print(" Le token et le cookie ne correspondent pas")
-            print("!"*70)
-            self.fail("ERREUR 403: Token != Cookie - problème reproduit!")
-        
+        # VALIDATION: Une attaque CSRF DOIT être rejetée avec 403
+        self.assertEqual(response.status_code, 403,
+            "La sécurité CSRF devrait rejeter un POST avec token != cookie!"
+        )
+        print("    ✅ Sécurité validée: Token invalide correctement rejeté")
         print("="*70)
