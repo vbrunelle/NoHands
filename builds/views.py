@@ -440,10 +440,22 @@ def proxy_to_container(request, build_id, path=''):
     
     try:
         # Forward the request to the container
+        # Exclude NoHands-specific cookies to avoid session conflicts
         headers = {
             key: value for key, value in request.headers.items()
-            if key.lower() not in ['host', 'connection']
+            if key.lower() not in ['host', 'connection', 'cookie']
         }
+        
+        # Extract and forward only non-NoHands cookies to the container
+        if 'Cookie' in request.headers:
+            nohands_cookies = ['nohands_sessionid', 'nohands_csrftoken']
+            cookies = request.headers['Cookie'].split('; ')
+            filtered_cookies = [
+                cookie for cookie in cookies
+                if not any(cookie.startswith(f'{name}=') for name in nohands_cookies)
+            ]
+            if filtered_cookies:
+                headers['Cookie'] = '; '.join(filtered_cookies)
         
         # Make the request to the container
         if request.method == 'GET':
@@ -524,10 +536,21 @@ def proxy_to_container(request, build_id, path=''):
             )
         
         # Copy response headers
-        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'location']
+        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'location', 'set-cookie']
         for key, value in resp.headers.items():
             if key.lower() not in excluded_headers:
                 response[key] = value
+        
+        # Handle Set-Cookie headers - need to adjust path for proxy
+        if 'set-cookie' in resp.headers:
+            cookies = resp.headers.get('set-cookie', '').split(',')
+            for cookie in cookies:
+                # Rewrite cookie path to be scoped to the proxy path
+                if 'Path=/' in cookie:
+                    cookie = cookie.replace('Path=/', f'Path=/builds/{build_id}/fwd/')
+                elif 'path=/' in cookie:
+                    cookie = cookie.replace('path=/', f'path=/builds/{build_id}/fwd/')
+                response['Set-Cookie'] = cookie
         
         # Rewrite Location header for redirects
         if 'location' in resp.headers:

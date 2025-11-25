@@ -195,3 +195,9 @@ SOCIALACCOUNT_PROVIDERS = {
 
 # Store OAuth tokens so we can use them to access GitHub API
 SOCIALACCOUNT_STORE_TOKENS = True
+
+# Session cookie configuration
+# Use a custom session cookie name to avoid conflicts with proxied applications
+SESSION_COOKIE_NAME = 'nohands_sessionid'
+# Also customize CSRF cookie name for consistency
+CSRF_COOKIE_NAME = 'nohands_csrftoken'
