@@ -100,6 +100,33 @@
                             {% endif %}
                         </div>
                     </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Container Port</div>
+                        <div class="datagrid-content">
+                            <code>{{ build.container_port }}</code>
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">Dockerfile Source</div>
+                        <div class="datagrid-content">
+                            {% if build.dockerfile_source == 'generated' %}
+                            <span class="badge bg-blue-lt">
+                                <i class="ti ti-wand me-1"></i>
+                                Auto-generated
+                            </span>
+                            {% elif build.dockerfile_source == 'custom' %}
+                            <span class="badge bg-purple-lt">
+                                <i class="ti ti-edit me-1"></i>
+                                Custom Content
+                            </span>
+                            {% elif build.dockerfile_source == 'repo_file' %}
+                            <span class="badge bg-green-lt">
+                                <i class="ti ti-file me-1"></i>
+                                {{ build.dockerfile_path }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -153,6 +180,128 @@
         </div>
     </div>
     
+    {% if build.status == 'success' %}
+    <!-- Container Control Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-container me-2"></i>
+                    Container
+                </h3>
+                <div class="card-actions">
+                    <span id="container-status-badge">
+                    {% if build.container_status == 'running' %}
+                    <span class="badge bg-green-lt me-2">
+                        <i class="ti ti-player-play"></i>
+                        Running
+                    </span>
+                    {% elif build.container_status == 'stopped' %}
+                    <span class="badge bg-gray-lt me-2">
+                        <i class="ti ti-player-stop"></i>
+                        Stopped
+                    </span>
+                    {% elif build.container_status == 'error' %}
+                    <span class="badge bg-red-lt me-2">
+                        <i class="ti ti-alert-circle"></i>
+                        Error
+                    </span>
+                    {% elif build.container_status == 'starting' %}
+                    <span class="badge bg-yellow-lt me-2">
+                        <i class="ti ti-loader"></i>
+                        Starting
+                    </span>
+                    {% else %}
+                    <span class="badge bg-gray-lt me-2">
+                        <i class="ti ti-player-stop"></i>
+                        Not Started
+                    </span>
+                    {% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="mb-2">
+                            <strong>Container Port:</strong> {{ build.container_port }}
+                            {% if build.host_port %}
+                            <i class="ti ti-arrow-right mx-1"></i>
+                            <strong>Host Port:</strong> <span id="host-port-display">{{ build.host_port }}</span>
+                            {% endif %}
+                        </div>
+                        {% if build.container_id %}
+                        <div class="mb-2">
+                            <strong>Container ID:</strong> <code id="container-id-display">{{ build.container_id|slice:":12" }}</code>
+                        </div>
+                        {% endif %}
+                        {% if build.container_status == 'running' and build.container_url %}
+                        <div class="mb-2">
+                            <strong>Application URL (direct):</strong> 
+                            <a href="{{ build.container_url }}" target="_blank" class="text-primary">
+                                <i class="ti ti-external-link me-1"></i>{{ build.container_url }}
+                            </a>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Application URL (proxy):</strong> 
+                            <a href="{% url 'proxy_to_container' build.id '' %}" target="_blank" class="text-primary">
+                                <i class="ti ti-external-link me-1"></i>{% url 'proxy_to_container' build.id '' %}
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 text-end">
+                        {% if build.container_status == 'running' %}
+                        <a href="{% url 'proxy_to_container' build.id '' %}" target="_blank" class="btn btn-success me-2">
+                            <i class="ti ti-external-link"></i>
+                            Open Application
+                        </a>
+                        <form action="{% url 'stop_build_container' build.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="ti ti-player-stop"></i>
+                                Stop Container
+                            </button>
+                        </form>
+                        {% else %}
+                        <form action="{% url 'start_build_container' build.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success">
+                                <i class="ti ti-player-play"></i>
+                                Start Container
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if build.container_status == 'running' %}
+    <!-- Container Logs Card - Auto-refresh without toggle -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-file-text me-2"></i>
+                    Container Logs
+                </h3>
+                <div class="card-actions">
+                    <span class="badge bg-green-lt">
+                        <i class="ti ti-refresh me-1"></i>
+                        Live
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <pre class="logs" id="container-logs" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; margin: 0;">Loading logs...</pre>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+    
     {% if build.error_message %}
     <!-- Error Message Card -->
     <div class="col-12">
@@ -165,6 +314,28 @@
             </div>
             <div class="card-body">
                 <div class="logs">{{ build.error_message }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if build.dockerfile_content %}
+    <!-- Dockerfile Content Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-file-code me-2"></i>
+                    Dockerfile Content
+                </h3>
+                <div class="card-actions">
+                    <span class="badge bg-{% if build.dockerfile_source == 'generated' %}blue{% elif build.dockerfile_source == 'custom' %}purple{% else %}green{% endif %}-lt">
+                        {{ build.get_dockerfile_source_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <pre class="logs" style="margin: 0;">{{ build.dockerfile_content }}</pre>
             </div>
         </div>
     </div>
@@ -208,4 +379,36 @@
     </div>
     {% endif %}
 </div>
+
+{% if build.container_status == 'running' %}
+<script>
+    // Auto-refresh container logs without any toggle - always on
+    const logsContainer = document.getElementById('container-logs');
+    
+    function fetchLogs() {
+        fetch('{% url "container_logs" build.id %}?tail=200')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.logs) {
+                        logsContainer.textContent = data.logs;
+                    } else {
+                        logsContainer.textContent = 'No logs available yet...';
+                    }
+                    // Auto-scroll to bottom
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                } else {
+                    logsContainer.textContent = data.error || 'Failed to load logs';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching logs:', error);
+            });
+    }
+    
+    // Start auto-refresh immediately - 2 second interval for near real-time updates
+    fetchLogs();
+    setInterval(fetchLogs, 2000);
+</script>
+{% endif %}
 {% endblock %}
