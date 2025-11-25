@@ -291,13 +291,28 @@ def load_image_from_tar(tar_path: str) -> str:
             raise DockerError(f"Failed to load image: {result.stderr}")
         
         # Parse the image tag from output
-        # Output is like: "Loaded image: image_name:tag"
+        # Output can be like: "Loaded image: image_name:tag" or "Loaded image ID: sha256:..."
         output = result.stdout.strip()
-        if 'Loaded image:' in output:
-            return output.split('Loaded image:')[1].strip()
         
-        logger.info(f"Loaded image from {tar_path}")
-        return output
+        # Try to extract the image reference
+        if 'Loaded image:' in output:
+            # Format: "Loaded image: image_name:tag"
+            image_ref = output.split('Loaded image:')[1].strip()
+            logger.info(f"Loaded image from {tar_path}: {image_ref}")
+            return image_ref
+        elif 'Loaded image ID:' in output:
+            # Format: "Loaded image ID: sha256:abc123..."
+            # Need to get the actual image ID without the sha256: prefix for docker run
+            image_id = output.split('Loaded image ID:')[1].strip()
+            # Remove sha256: prefix if present
+            if image_id.startswith('sha256:'):
+                image_id = image_id[7:]
+            logger.info(f"Loaded image from {tar_path}: {image_id}")
+            return image_id
+        else:
+            # Fallback: return the whole output
+            logger.warning(f"Unexpected docker load output format: {output}")
+            return output
         
     except subprocess.TimeoutExpired:
         raise DockerError("Timeout while loading image")

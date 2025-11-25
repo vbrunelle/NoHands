@@ -237,16 +237,22 @@
                         {% endif %}
                         {% if build.container_status == 'running' and build.container_url %}
                         <div class="mb-2">
-                            <strong>Application URL:</strong> 
+                            <strong>Application URL (direct):</strong> 
                             <a href="{{ build.container_url }}" target="_blank" class="text-primary">
                                 <i class="ti ti-external-link me-1"></i>{{ build.container_url }}
+                            </a>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Application URL (proxy):</strong> 
+                            <a href="{% url 'proxy_to_container' build.id '' %}" target="_blank" class="text-primary">
+                                <i class="ti ti-external-link me-1"></i>{% url 'proxy_to_container' build.id '' %}
                             </a>
                         </div>
                         {% endif %}
                     </div>
                     <div class="col-md-6 text-end">
                         {% if build.container_status == 'running' %}
-                        <a href="{{ build.container_url }}" target="_blank" class="btn btn-success me-2">
+                        <a href="{% url 'proxy_to_container' build.id '' %}" target="_blank" class="btn btn-success me-2">
                             <i class="ti ti-external-link"></i>
                             Open Application
                         </a>

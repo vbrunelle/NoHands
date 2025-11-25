@@ -3,11 +3,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from pathlib import Path
 import logging
 import threading
 import os
+import requests
 
 from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE, get_dockerfile_templates, get_default_template
 from projects.models import GitRepository, Commit
@@ -407,4 +408,99 @@ def execute_build(build_id: int):
             build.save()
         except Exception:
             pass
+
+
+@login_required
+def proxy_to_container(request, build_id, path=''):
+    """
+    Proxy requests to a running container.
+    This allows accessing the container through Django without port forwarding.
+    
+    URL pattern: /builds/<build_id>/fwd/<path>
+    Example: /builds/9/fwd/ -> http://localhost:8002/
+             /builds/9/fwd/admin/ -> http://localhost:8002/admin/
+    """
+    build = get_object_or_404(Build, id=build_id)
+    
+    # Check if container is running
+    if build.container_status != 'running' or not build.host_port:
+        return HttpResponse(
+            f"Container is not running. Status: {build.container_status}",
+            status=503
+        )
+    
+    # Build target URL
+    target_url = f"http://127.0.0.1:{build.host_port}/{path}"
+    
+    # Copy query parameters
+    if request.GET:
+        query_string = request.GET.urlencode()
+        target_url += f"?{query_string}"
+    
+    try:
+        # Forward the request to the container
+        headers = {
+            key: value for key, value in request.headers.items()
+            if key.lower() not in ['host', 'connection']
+        }
+        
+        # Make the request to the container
+        if request.method == 'GET':
+            resp = requests.get(target_url, headers=headers, stream=True, timeout=30)
+        elif request.method == 'POST':
+            resp = requests.post(
+                target_url,
+                data=request.body,
+                headers=headers,
+                stream=True,
+                timeout=30
+            )
+        elif request.method == 'PUT':
+            resp = requests.put(
+                target_url,
+                data=request.body,
+                headers=headers,
+                stream=True,
+                timeout=30
+            )
+        elif request.method == 'DELETE':
+            resp = requests.delete(target_url, headers=headers, timeout=30)
+        elif request.method == 'PATCH':
+            resp = requests.patch(
+                target_url,
+                data=request.body,
+                headers=headers,
+                timeout=30
+            )
+        else:
+            return HttpResponse(f"Method {request.method} not supported", status=405)
+        
+        # Create response
+        response = StreamingHttpResponse(
+            resp.iter_content(chunk_size=8192),
+            status=resp.status_code,
+            content_type=resp.headers.get('content-type', 'text/html')
+        )
+        
+        # Copy response headers
+        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
+        for key, value in resp.headers.items():
+            if key.lower() not in excluded_headers:
+                response[key] = value
+        
+        return response
+        
+    except requests.exceptions.ConnectionError:
+        return HttpResponse(
+            f"Could not connect to container on port {build.host_port}",
+            status=503
+        )
+    except requests.exceptions.Timeout:
+        return HttpResponse(
+            f"Request to container timed out",
+            status=504
+        )
+    except Exception as e:
+        logger.error(f"Proxy error for build {build_id}: {e}")
+        return HttpResponse(f"Proxy error: {str(e)}", status=500)
 
