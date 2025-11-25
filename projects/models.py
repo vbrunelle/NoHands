@@ -31,6 +31,8 @@ class AppConfiguration(models.Model):
             existing = AppConfiguration.objects.first()
             existing.app_url = self.app_url
             existing.save()
+            # Set self.pk so caller gets a valid saved instance reference
+            self.pk = existing.pk
             return
         super().save(*args, **kwargs)
 

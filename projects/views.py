@@ -35,7 +35,13 @@ def get_env_file_path():
 def read_env_values():
     """
     Read GitHub OAuth credentials and app URL from .env file if it exists.
-    Returns a dict with client_id, client_secret, and app_url (empty strings if not found).
+    
+    Returns a dict with the following keys (all values are empty strings if not found):
+        - client_id: GitHub OAuth Client ID
+        - client_secret: GitHub OAuth Client Secret  
+        - app_url: Application base URL (e.g., http://localhost:8000)
+    
+    Values are first read from .env file, then fallback to environment variables.
     """
     env_path = get_env_file_path()
     values = {'client_id': '', 'client_secret': '', 'app_url': ''}
@@ -73,6 +79,16 @@ def write_env_values(client_id, client_secret, app_url=None):
     """
     Write GitHub OAuth credentials and app URL to .env file.
     Creates the file if it doesn't exist, updates existing values if it does.
+    
+    Args:
+        client_id: GitHub OAuth Client ID (required)
+        client_secret: GitHub OAuth Client Secret (required)
+        app_url: Application base URL (optional). If None, the existing 
+                 NOHANDS_APP_URL value in .env will be preserved. If provided,
+                 it will be written/updated in the .env file.
+    
+    Returns:
+        True if file was written successfully, False otherwise.
     """
     env_path = get_env_file_path()
     existing_lines = []

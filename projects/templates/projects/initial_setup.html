@@ -98,31 +98,31 @@
                                 
                                 <div class="row g-3">
                                     <div class="col-12">
-                                        <label class="form-label text-muted small">Application name</label>
+                                        <label class="form-label text-muted small" id="app_name_label">Application name</label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control bg-light" id="app_name" value="NoHands" readonly>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('app_name')" title="Copy to clipboard">
-                                                <i class="ti ti-copy"></i>
+                                            <input type="text" class="form-control bg-light" id="app_name" value="NoHands" readonly aria-labelledby="app_name_label">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('app_name')" title="Copy application name to clipboard" aria-label="Copy application name to clipboard">
+                                                <i class="ti ti-copy" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                     </div>
                                     
                                     <div class="col-12">
-                                        <label class="form-label text-muted small">Homepage URL</label>
+                                        <label class="form-label text-muted small" id="homepage_url_label">Homepage URL</label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control bg-light" id="homepage_url" value="{{ detected_app_url }}" readonly>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('homepage_url')" title="Copy to clipboard">
-                                                <i class="ti ti-copy"></i>
+                                            <input type="text" class="form-control bg-light" id="homepage_url" value="{{ detected_app_url }}" readonly aria-labelledby="homepage_url_label">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('homepage_url')" title="Copy homepage URL to clipboard" aria-label="Copy homepage URL to clipboard">
+                                                <i class="ti ti-copy" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                     </div>
                                     
                                     <div class="col-12">
-                                        <label class="form-label text-muted small">Authorization callback URL <span class="text-danger">*</span></label>
+                                        <label class="form-label text-muted small" id="callback_url_label">Authorization callback URL <span class="text-danger">*</span></label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control bg-light" id="callback_url" value="{{ callback_url }}" readonly>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('callback_url')" title="Copy to clipboard">
-                                                <i class="ti ti-copy"></i>
+                                            <input type="text" class="form-control bg-light" id="callback_url" value="{{ callback_url }}" readonly aria-labelledby="callback_url_label">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('callback_url')" title="Copy callback URL to clipboard" aria-label="Copy callback URL to clipboard">
+                                                <i class="ti ti-copy" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                         <div class="form-hint text-danger">
@@ -270,9 +270,9 @@
                         Advanced users can also create an admin account using:
                     </small>
                     <div class="input-group input-group-sm mt-2 mx-auto" style="max-width: 400px;">
-                        <input type="text" class="form-control bg-light text-center font-monospace" id="cmd_superuser" value="python manage.py createsuperuser" readonly>
-                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('cmd_superuser')" title="Copy to clipboard">
-                            <i class="ti ti-copy"></i>
+                        <input type="text" class="form-control bg-light text-center font-monospace" id="cmd_superuser" value="python manage.py createsuperuser" readonly aria-label="Django superuser command">
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('cmd_superuser')" title="Copy command to clipboard" aria-label="Copy superuser command to clipboard">
+                            <i class="ti ti-copy" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
