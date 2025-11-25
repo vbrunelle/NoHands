@@ -11,4 +11,6 @@ urlpatterns = [
     # API endpoints for file selection
     path('api/files/<int:repo_id>/<int:commit_id>/', views.list_commit_files, name='list_commit_files'),
     path('api/file-content/<int:repo_id>/<int:commit_id>/', views.get_commit_file_content, name='get_commit_file_content'),
+    # API endpoint for Dockerfile templates
+    path('api/templates/<str:template_name>/', views.get_dockerfile_template, name='get_dockerfile_template'),
 ]

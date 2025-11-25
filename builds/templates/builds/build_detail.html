@@ -190,6 +190,7 @@
                     Container
                 </h3>
                 <div class="card-actions">
+                    <span id="container-status-badge">
                     {% if build.container_status == 'running' %}
                     <span class="badge bg-green-lt me-2">
                         <i class="ti ti-player-play"></i>
@@ -216,6 +217,7 @@
                         Not Started
                     </span>
                     {% endif %}
+                    </span>
                 </div>
             </div>
             <div class="card-body">
@@ -225,12 +227,12 @@
                             <strong>Container Port:</strong> {{ build.container_port }}
                             {% if build.host_port %}
                             <i class="ti ti-arrow-right mx-1"></i>
-                            <strong>Host Port:</strong> {{ build.host_port }}
+                            <strong>Host Port:</strong> <span id="host-port-display">{{ build.host_port }}</span>
                             {% endif %}
                         </div>
                         {% if build.container_id %}
                         <div class="mb-2">
-                            <strong>Container ID:</strong> <code>{{ build.container_id|slice:":12" }}</code>
+                            <strong>Container ID:</strong> <code id="container-id-display">{{ build.container_id|slice:":12" }}</code>
                         </div>
                         {% endif %}
                     </div>
@@ -263,19 +265,19 @@
     </div>
     
     {% if build.container_status == 'running' %}
-    <!-- Container Logs Card -->
+    <!-- Container Logs Card - Auto-refresh without toggle -->
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
                     <i class="ti ti-file-text me-2"></i>
-                    Container Logs (Live)
+                    Container Logs
                 </h3>
                 <div class="card-actions">
-                    <label class="form-check form-switch m-0">
-                        <input class="form-check-input" type="checkbox" id="auto-refresh-logs" checked>
-                        <span class="form-check-label">Auto-refresh</span>
-                    </label>
+                    <span class="badge bg-green-lt">
+                        <i class="ti ti-refresh me-1"></i>
+                        Live
+                    </span>
                 </div>
             </div>
             <div class="card-body">
@@ -366,10 +368,8 @@
 
 {% if build.container_status == 'running' %}
 <script>
-    // Auto-refresh container logs
-    let refreshInterval = null;
+    // Auto-refresh container logs without any toggle - always on
     const logsContainer = document.getElementById('container-logs');
-    const autoRefreshCheckbox = document.getElementById('auto-refresh-logs');
     
     function fetchLogs() {
         fetch('{% url "container_logs" build.id %}?tail=200')
@@ -385,11 +385,6 @@
                     logsContainer.scrollTop = logsContainer.scrollHeight;
                 } else {
                     logsContainer.textContent = data.error || 'Failed to load logs';
-                    // Stop auto-refresh if container is not running
-                    if (refreshInterval) {
-                        clearInterval(refreshInterval);
-                        refreshInterval = null;
-                    }
                 }
             })
             .catch(error => {
@@ -397,28 +392,9 @@
             });
     }
     
-    function startAutoRefresh() {
-        fetchLogs();
-        refreshInterval = setInterval(fetchLogs, 3000);
-    }
-    
-    function stopAutoRefresh() {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-            refreshInterval = null;
-        }
-    }
-    
-    autoRefreshCheckbox.addEventListener('change', function() {
-        if (this.checked) {
-            startAutoRefresh();
-        } else {
-            stopAutoRefresh();
-        }
-    });
-    
-    // Start auto-refresh on page load
-    startAutoRefresh();
+    // Start auto-refresh immediately - 2 second interval for near real-time updates
+    fetchLogs();
+    setInterval(fetchLogs, 2000);
 </script>
 {% endif %}
 {% endblock %}

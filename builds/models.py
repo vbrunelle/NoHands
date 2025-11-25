@@ -1,8 +1,50 @@
 from django.db import models
 from projects.models import GitRepository, Commit
+from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Directory containing Dockerfile templates
+DOCKERFILE_TEMPLATES_DIR = Path(__file__).parent / 'dockerfile_templates'
 
 
-# Default Dockerfile template for auto-generation
+def get_dockerfile_templates():
+    """
+    Load all Dockerfile templates from the templates directory.
+    Returns a dictionary of {template_name: template_content}.
+    """
+    templates = {}
+    
+    if DOCKERFILE_TEMPLATES_DIR.exists():
+        for file_path in DOCKERFILE_TEMPLATES_DIR.glob('*.dockerfile'):
+            # Use filename without extension as template name
+            template_name = file_path.stem
+            try:
+                with open(file_path, 'r') as f:
+                    templates[template_name] = f.read()
+            except (IOError, OSError) as e:
+                logger.warning(f"Failed to read Dockerfile template '{template_name}': {e}")
+    
+    return templates
+
+
+def get_template_choices():
+    """
+    Get template choices for use in forms/models.
+    Returns a list of tuples [(template_name, template_name), ...]
+    """
+    templates = get_dockerfile_templates()
+    return [(name, name) for name in sorted(templates.keys())]
+
+
+def get_default_template():
+    """Get the default Dockerfile template (Python)."""
+    templates = get_dockerfile_templates()
+    return templates.get('Python', DEFAULT_DOCKERFILE_TEMPLATE)
+
+
+# Default Dockerfile template for auto-generation (fallback)
 DEFAULT_DOCKERFILE_TEMPLATE = """# Auto-generated Dockerfile
 FROM python:3.11-slim
 

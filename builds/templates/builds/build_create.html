@@ -76,7 +76,7 @@
                                 <input type="radio" name="dockerfile_source" value="generated" class="form-selectgroup-input" checked>
                                 <span class="form-selectgroup-label">
                                     <i class="ti ti-wand me-1"></i>
-                                    Auto-generated
+                                    Template
                                 </span>
                             </label>
                             <label class="form-selectgroup-item">
@@ -96,6 +96,21 @@
                         </div>
                         <small class="form-hint">
                             Choose how to provide the Dockerfile for this build.
+                        </small>
+                    </div>
+                    
+                    <!-- Template Selection Dropdown -->
+                    <div class="mb-3" id="template-selection-section">
+                        <label class="form-label" for="dockerfile_template">
+                            <strong>Select Template</strong>
+                        </label>
+                        <select class="form-select" id="dockerfile_template" name="dockerfile_template">
+                            {% for name, content in dockerfile_templates.items %}
+                            <option value="{{ name }}" {% if name == "Python" %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-hint">
+                            Select a pre-made Dockerfile template for your application type.
                         </small>
                     </div>
                     
@@ -195,7 +210,7 @@
                             </div>
                             <div class="col text-truncate">
                                 <div class="text-reset d-block">Flexible Dockerfile</div>
-                                <div class="d-block text-muted text-truncate mt-n1">Auto-generate or use your own</div>
+                                <div class="d-block text-muted text-truncate mt-n1">Use templates or your own</div>
                             </div>
                         </div>
                     </div>
@@ -232,6 +247,29 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Available Templates Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-template me-2"></i>
+                    Available Templates
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-2">
+                    Pre-configured Dockerfile templates:
+                </p>
+                <div class="list-group list-group-flush">
+                    {% for name, content in dockerfile_templates.items %}
+                    <div class="list-group-item d-flex align-items-center">
+                        <i class="ti ti-file-code text-muted me-2"></i>
+                        <span>{{ name }}</span>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -277,6 +315,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const dockerfileSourceInputs = document.querySelectorAll('input[name="dockerfile_source"]');
     const dockerfileContentSection = document.getElementById('dockerfile-content-section');
     const dockerfileFileSection = document.getElementById('dockerfile-file-section');
+    const templateSelectionSection = document.getElementById('template-selection-section');
+    const templateSelect = document.getElementById('dockerfile_template');
+    const dockerfileContentTextarea = document.getElementById('dockerfile_content');
     const browseFilesBtn = document.getElementById('browse-files-btn');
     const fileBrowserModal = new bootstrap.Modal(document.getElementById('file-browser-modal'));
     const fileListEl = document.getElementById('file-list');
@@ -293,12 +334,38 @@ document.addEventListener('DOMContentLoaded', function() {
             if (this.value === 'repo_file') {
                 dockerfileContentSection.style.display = 'none';
                 dockerfileFileSection.style.display = 'block';
-            } else {
+                templateSelectionSection.style.display = 'none';
+            } else if (this.value === 'generated') {
                 dockerfileContentSection.style.display = 'block';
                 dockerfileFileSection.style.display = 'none';
+                templateSelectionSection.style.display = 'block';
+            } else {
+                // custom
+                dockerfileContentSection.style.display = 'block';
+                dockerfileFileSection.style.display = 'none';
+                templateSelectionSection.style.display = 'none';
             }
         });
     });
+    
+    // Handle template selection change
+    templateSelect.addEventListener('change', function() {
+        const templateName = this.value;
+        loadTemplate(templateName);
+    });
+    
+    function loadTemplate(templateName) {
+        fetch(`/builds/api/templates/${encodeURIComponent(templateName)}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    dockerfileContentTextarea.value = data.content;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading template:', error);
+            });
+    }
     
     // Load files when browse button clicked
     browseFilesBtn.addEventListener('click', function() {

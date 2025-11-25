@@ -704,3 +704,116 @@ class FileListAPITest(TestCase):
         data = response.json()
         self.assertFalse(data['success'])
         self.assertEqual(data['error'], 'File path is required')
+
+
+class DockerfileTemplatesTest(TestCase):
+    """Tests for Dockerfile templates functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+    
+    def test_get_dockerfile_templates(self):
+        """Test that templates are loaded from the templates directory."""
+        from builds.models import get_dockerfile_templates
+        
+        templates = get_dockerfile_templates()
+        
+        # Should have several templates
+        self.assertGreater(len(templates), 0)
+        
+        # Check for expected templates
+        self.assertIn('Python', templates)
+        self.assertIn('Django', templates)
+        self.assertIn('Flask', templates)
+        self.assertIn('FastAPI', templates)
+        self.assertIn('Node.js', templates)
+        self.assertIn('React', templates)
+        self.assertIn('Go', templates)
+    
+    def test_get_template_choices(self):
+        """Test that template choices are generated correctly."""
+        from builds.models import get_template_choices
+        
+        choices = get_template_choices()
+        
+        # Should be a list of tuples
+        self.assertIsInstance(choices, list)
+        self.assertGreater(len(choices), 0)
+        
+        # Each choice should be a tuple of (name, name)
+        for choice in choices:
+            self.assertIsInstance(choice, tuple)
+            self.assertEqual(len(choice), 2)
+            self.assertEqual(choice[0], choice[1])
+    
+    def test_get_default_template(self):
+        """Test that default template is Python."""
+        from builds.models import get_default_template
+        
+        default = get_default_template()
+        
+        # Should contain Python-related content
+        self.assertIn('python', default.lower())
+    
+    def test_template_api_url_resolves(self):
+        """Test template API URL resolves correctly."""
+        url = reverse('get_dockerfile_template', args=['Python'])
+        self.assertEqual(url, '/builds/api/templates/Python/')
+    
+    def test_template_api_returns_content(self):
+        """Test template API returns template content."""
+        url = reverse('get_dockerfile_template', args=['Python'])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['name'], 'Python')
+        self.assertIn('python', data['content'].lower())
+    
+    def test_template_api_invalid_template(self):
+        """Test template API returns error for invalid template."""
+        url = reverse('get_dockerfile_template', args=['InvalidTemplate'])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('not found', data['error'])
+    
+    def test_django_template_content(self):
+        """Test Django template has correct content."""
+        from builds.models import get_dockerfile_templates
+        
+        templates = get_dockerfile_templates()
+        django_template = templates.get('Django', '')
+        
+        self.assertIn('gunicorn', django_template.lower())
+        self.assertIn('django', django_template.lower())
+    
+    def test_flask_template_content(self):
+        """Test Flask template has correct content."""
+        from builds.models import get_dockerfile_templates
+        
+        templates = get_dockerfile_templates()
+        flask_template = templates.get('Flask', '')
+        
+        self.assertIn('flask', flask_template.lower())
+        self.assertIn('gunicorn', flask_template.lower())
+    
+    def test_nodejs_template_content(self):
+        """Test Node.js template has correct content."""
+        from builds.models import get_dockerfile_templates
+        
+        templates = get_dockerfile_templates()
+        nodejs_template = templates.get('Node.js', '')
+        
+        self.assertIn('node', nodejs_template.lower())
+        self.assertIn('npm', nodejs_template.lower())

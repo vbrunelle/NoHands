@@ -9,7 +9,7 @@ import logging
 import threading
 import os
 
-from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE
+from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE, get_dockerfile_templates, get_default_template
 from projects.models import GitRepository, Commit
 from projects.git_utils import (
     checkout_commit, clone_or_update_repo, GitUtilsError,
@@ -103,10 +103,15 @@ def build_create(request, repo_id, commit_id):
         messages.success(request, f"Build #{build.id} started")
         return redirect('build_detail', build_id=build.id)
     
+    # Get Dockerfile templates
+    templates = get_dockerfile_templates()
+    default_template = get_default_template()
+    
     return render(request, 'builds/build_create.html', {
         'repository': repository,
         'commit': commit,
-        'default_dockerfile': DEFAULT_DOCKERFILE_TEMPLATE
+        'default_dockerfile': default_template,
+        'dockerfile_templates': templates
     })
 
 
@@ -305,6 +310,27 @@ def get_commit_file_content(request, repo_id, commit_id):
         return JsonResponse({
             'success': False,
             'error': str(e),
+            'content': ''
+        })
+
+
+@login_required
+def get_dockerfile_template(request, template_name):
+    """
+    Get a specific Dockerfile template by name (JSON API).
+    """
+    templates = get_dockerfile_templates()
+    
+    if template_name in templates:
+        return JsonResponse({
+            'success': True,
+            'name': template_name,
+            'content': templates[template_name]
+        })
+    else:
+        return JsonResponse({
+            'success': False,
+            'error': f"Template '{template_name}' not found",
             'content': ''
         })
 
