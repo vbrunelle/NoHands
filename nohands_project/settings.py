@@ -27,7 +27,18 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-p8q%n4$u1&g0f(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else []
+# Django's built-in ALLOWED_HOSTS from environment variable
+# Our DynamicAllowedHostsMiddleware handles additional host validation
+# based on database state (allowing any host during initial setup)
+_ENV_ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else []
+
+# We always include '*' to let Django pass through requests
+# Our DynamicAllowedHostsMiddleware does the actual validation
+# combining both database hosts and _ENV_ALLOWED_HOSTS
+ALLOWED_HOSTS = ['*']
+
+# Store the env-configured hosts separately for use in middleware
+DJANGO_ALLOWED_HOSTS_FROM_ENV = [h.strip() for h in _ENV_ALLOWED_HOSTS if h.strip()]
 
 
 # Application definition
@@ -53,6 +64,7 @@ INSTALLED_APPS = [
 SITE_ID = 1
 
 MIDDLEWARE = [
+    'nohands_project.middleware.DynamicAllowedHostsMiddleware',  # Must be first to validate hosts early
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

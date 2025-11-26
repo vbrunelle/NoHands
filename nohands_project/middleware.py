@@ -3,7 +3,12 @@ Middleware for NoHands project.
 """
 from django.shortcuts import redirect, render
 from django.contrib.auth.models import User
+from django.http import HttpResponseBadRequest
+from django.conf import settings
 from allauth.socialaccount.models import SocialApp
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class InitialSetupMiddleware:
@@ -89,3 +94,87 @@ class SocialAppErrorMiddleware:
             }
             return render(request, 'socialaccount/authentication_error.html', context, status=500)
         return None
+
+
+class DynamicAllowedHostsMiddleware:
+    """
+    Middleware to dynamically manage allowed hosts based on application state.
+    
+    Behavior:
+    - During first start (no users exist): Any host is allowed to facilitate initial setup.
+      The host from the first setup request is automatically added to the allowed hosts list.
+    - After setup (users exist): Only hosts in the AllowedHost database table are allowed.
+      If a request comes from a disallowed host, a 400 Bad Request is returned.
+    
+    This middleware should be placed early in the middleware stack to validate hosts
+    before other middleware runs.
+    
+    Note: Django's ALLOWED_HOSTS is set to ['*'] in settings to allow all requests through
+    to this middleware. The actual host validation is handled here.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        from projects.models import AllowedHost
+        
+        # Get the host from the request (includes port if present)
+        host = request.get_host()
+        
+        # Check if any users exist (i.e., setup is complete)
+        has_users = User.objects.exists()
+        
+        if not has_users:
+            # During initial setup, allow any host
+            # The host will be added to allowed hosts during the setup process
+            return self.get_response(request)
+        
+        # After setup, check if the host is in the allowed hosts list
+        # First check database allowed hosts
+        db_hosts = AllowedHost.get_all_active_hosts()
+        
+        # Also check DJANGO_ALLOWED_HOSTS_FROM_ENV (from environment variable)
+        env_hosts = getattr(settings, 'DJANGO_ALLOWED_HOSTS_FROM_ENV', [])
+        
+        # Combine both lists, filtering out empty strings
+        all_allowed_hosts = [h for h in (db_hosts + env_hosts) if h]
+        
+        # If no hosts are configured at all, allow all (but log a warning)
+        if not all_allowed_hosts:
+            logger.warning(
+                "No allowed hosts configured. Consider adding hosts via admin panel."
+            )
+            return self.get_response(request)
+        
+        # Check if the host is allowed
+        # Support wildcard matching (e.g., '*' allows all, '.example.com' allows subdomains)
+        if self._is_host_allowed(host, all_allowed_hosts):
+            return self.get_response(request)
+        
+        # Host not allowed - return 400 Bad Request
+        logger.warning(f"Blocked request from disallowed host: {host}")
+        return HttpResponseBadRequest(
+            f"Invalid HTTP_HOST header: '{host}'. "
+            f"You may need to add '{host}' to your allowed hosts in the admin panel."
+        )
+    
+    def _is_host_allowed(self, host, allowed_hosts):
+        """Check if a host matches any of the allowed host patterns."""
+        # Remove port from host for matching
+        host_without_port = host.split(':')[0]
+        
+        for pattern in allowed_hosts:
+            if pattern == '*':
+                # Wildcard matches everything
+                return True
+            elif pattern.startswith('.'):
+                # Subdomain wildcard (e.g., '.example.com' matches 'sub.example.com')
+                if host_without_port == pattern[1:] or host_without_port.endswith(pattern):
+                    return True
+            else:
+                # Exact match (with or without port)
+                if host == pattern or host_without_port == pattern:
+                    return True
+        
+        return False

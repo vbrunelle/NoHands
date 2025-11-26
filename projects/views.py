@@ -11,7 +11,7 @@ import os
 from github import Github
 from allauth.socialaccount.models import SocialToken, SocialApp
 
-from .models import GitRepository, Branch, Commit, AppConfiguration
+from .models import GitRepository, Branch, Commit, AppConfiguration, AllowedHost
 from .git_utils import clone_or_update_repo, list_branches, list_commits, GitUtilsError
 
 logger = logging.getLogger(__name__)
@@ -233,6 +233,13 @@ def initial_setup(request):
                 config.save()
             except Exception as e:
                 logger.warning(f"Failed to save app URL to database: {e}")
+            
+            # Add the current host to allowed hosts
+            try:
+                AllowedHost.add_host(site_domain)
+                logger.info(f"Added '{site_domain}' to allowed hosts during initial setup")
+            except Exception as e:
+                logger.warning(f"Failed to add host to allowed hosts: {e}")
             
             # Save to .env file if requested
             env_success = True
