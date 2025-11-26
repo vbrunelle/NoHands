@@ -5,7 +5,7 @@
 # For format details, see: https://gh.io/customagents/config
 
 name: Fixer
-description:
+description: Fix the bugs using the TDD approach
 ---
 
 # My Agent
