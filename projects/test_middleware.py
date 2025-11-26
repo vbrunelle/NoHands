@@ -391,3 +391,148 @@ class AllowedHostModelTest(TestCase):
         self.assertIn('active', str(active_host))
         self.assertIn('inactive.com', str(inactive_host))
         self.assertIn('inactive', str(inactive_host))
+
+
+class InitialSetupUnknownHostTest(TestCase):
+    """
+    Test cases for the initial setup scenario when accessing from an unknown external host.
+    
+    This test reproduces the issue where accessing NoHands from a remote machine (e.g., machine.local:8000)
+    before initial setup causes a DisallowedHost error instead of showing the setup page.
+    
+    Relevant issue: "Still checking to see if current host is in the allowed host before
+    the first initialization of the NoHands server"
+    """
+    
+    def setUp(self):
+        # Ensure no users exist to simulate fresh installation
+        User.objects.all().delete()
+        # Clear any allowed hosts
+        AllowedHost.objects.all().delete()
+    
+    def test_unknown_external_host_allowed_during_initial_setup(self):
+        """
+        Test that an unknown external host (e.g., machine.local:8000) is allowed
+        when accessing the server before initial setup.
+        
+        This simulates the issue where:
+        1. User starts NoHands on a remote machine (e.g., ceos.home)
+        2. User tries to access the initial setup page from another machine
+        3. Request should succeed and show setup page, not raise DisallowedHost
+        """
+        client = Client()
+        
+        # Simulate accessing from an external unknown host
+        response = client.get('/', HTTP_HOST='machine.local:8000')
+        
+        # Should redirect to initial setup, not raise DisallowedHost
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '/repositories/initial-setup/')
+    
+    def test_unknown_host_can_access_initial_setup_page(self):
+        """
+        Test that the initial setup page itself is accessible from an unknown host
+        when no users exist (fresh installation).
+        """
+        client = Client()
+        
+        # Access setup page from an unknown external host
+        response = client.get('/repositories/initial-setup/', HTTP_HOST='ceos.home:8000')
+        
+        # Should return 200, not DisallowedHost error
+        self.assertEqual(response.status_code, 200)
+    
+    def test_various_unknown_hosts_allowed_during_initial_setup(self):
+        """
+        Test various types of unknown hosts during initial setup.
+        
+        Tests hosts like:
+        - Local network hostnames (e.g., myserver.local)
+        - IP addresses with ports
+        - Domain names
+        - Hostnames with hyphens
+        """
+        client = Client()
+        unknown_hosts = [
+            'myserver.local:8000',
+            '192.168.1.100:8000',
+            'unknown-server.home:8000',
+            'test-machine:8000',
+            'my-host.domain.com:8000',
+        ]
+        
+        for host in unknown_hosts:
+            response = client.get('/', HTTP_HOST=host)
+            self.assertEqual(
+                response.status_code, 
+                302, 
+                f"Host '{host}' should redirect to setup, got status {response.status_code}"
+            )
+            self.assertEqual(
+                response.url,
+                '/repositories/initial-setup/',
+                f"Host '{host}' should redirect to /repositories/initial-setup/"
+            )
+    
+    def test_accounts_paths_accessible_from_unknown_host_during_setup(self):
+        """
+        Test that OAuth/accounts paths are accessible from unknown hosts during initial setup.
+        This is necessary for the GitHub OAuth flow to work during first setup.
+        """
+        client = Client()
+        
+        # Access accounts paths from unknown host
+        response = client.get('/accounts/login/', HTTP_HOST='remote.server:8000')
+        
+        # Should be accessible (200 or redirect within accounts), not DisallowedHost
+        self.assertIn(response.status_code, [200, 302])
+        if response.status_code == 302:
+            # Should not redirect to initial setup (accounts is exempt)
+            self.assertNotEqual(response.url, '/repositories/initial-setup/')
+    
+    def test_api_accessible_from_unknown_host_during_setup(self):
+        """
+        Test that API paths return proper authentication error (not DisallowedHost)
+        when accessed from unknown host during initial setup.
+        """
+        client = Client()
+        
+        response = client.get('/api/repositories/', HTTP_HOST='external.machine:8000')
+        
+        # Should return 403 (permission denied), not DisallowedHost error
+        self.assertEqual(response.status_code, 403)
+
+
+class DatabaseUnavailableMiddlewareTest(TestCase):
+    """
+    Test cases for middleware behavior when database is unavailable.
+    
+    The middleware should gracefully handle cases where the database
+    is not yet available (e.g., during startup, before migrations).
+    """
+    
+    def test_middleware_handles_allowedhost_query_exception(self):
+        """
+        Test that middleware gracefully handles exceptions when querying AllowedHost.
+        
+        When AllowedHost.get_all_active_hosts() fails, the middleware should
+        fall back to environment-based allowed hosts or allow all.
+        """
+        from unittest.mock import patch
+        
+        # Create a user so we pass the initial setup check
+        User.objects.create_user(username='testuser', password='testpass')
+        
+        client = Client()
+        
+        # Mock AllowedHost.get_all_active_hosts() to raise an exception
+        with patch('projects.models.AllowedHost.get_all_active_hosts') as mock_get_hosts:
+            mock_get_hosts.side_effect = Exception("Database unavailable")
+            
+            with self.settings(DJANGO_ALLOWED_HOSTS_FROM_ENV=['testserver']):
+                # Should use env hosts and allow the request
+                client.login(username='testuser', password='testpass')
+                response = client.get('/repositories/')
+                
+                # Should return 200 since testserver is in env hosts
+                self.assertEqual(response.status_code, 200)

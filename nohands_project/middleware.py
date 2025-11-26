@@ -34,7 +34,13 @@ class InitialSetupMiddleware:
     
     def __call__(self, request):
         # Check if any users exist
-        has_users = User.objects.exists()
+        # Wrap in try/except to handle cases where database isn't ready
+        try:
+            has_users = User.objects.exists()
+        except Exception:
+            # If database is not available, allow the request through
+            # This ensures the server can start even if DB is not ready yet
+            return self.get_response(request)
         
         # If no users exist and the request is not to an exempt path
         if not has_users:
@@ -124,7 +130,13 @@ class DynamicAllowedHostsMiddleware:
         host = request.get_host()
         
         # Check if any users exist (i.e., setup is complete)
-        has_users = User.objects.exists()
+        # Wrap in try/except to handle cases where database isn't ready
+        try:
+            has_users = User.objects.exists()
+        except Exception:
+            # If database is not available (e.g., during startup), allow all hosts
+            # This ensures the server can start even if DB is not ready yet
+            return self.get_response(request)
         
         if not has_users:
             # During initial setup, allow any host
@@ -133,7 +145,11 @@ class DynamicAllowedHostsMiddleware:
         
         # After setup, check if the host is in the allowed hosts list
         # First check database allowed hosts
-        db_hosts = self.AllowedHost.get_all_active_hosts()
+        try:
+            db_hosts = self.AllowedHost.get_all_active_hosts()
+        except Exception:
+            # If database is not available, use empty list
+            db_hosts = []
         
         # Also check DJANGO_ALLOWED_HOSTS_FROM_ENV (from environment variable)
         env_hosts = getattr(settings, 'DJANGO_ALLOWED_HOSTS_FROM_ENV', [])
