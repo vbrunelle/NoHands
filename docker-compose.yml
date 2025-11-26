@@ -6,7 +6,7 @@ services:
     environment:
       # Optional: Override the default Django secret key for production deployments
       # The app has a built-in default key suitable for development/testing
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-default-dev-key}
       - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
