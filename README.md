@@ -1471,6 +1471,7 @@ repo_id=$(echo "$repos" | jq -r '.[0].id')
 
 # Create build and get result as JSON
 result=$(python manage.py build_create "$repo_id" --format=json)
+build_id=$(echo "$result" | jq -r '.id')
 build_status=$(echo "$result" | jq -r '.status')
 
 if [ "$build_status" = "success" ]; then

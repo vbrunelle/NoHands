@@ -90,7 +90,10 @@ class Command(BaseCommand):
                     'cancelled': self.style.NOTICE,
                 }.get(build.status, lambda x: x)
                 
+                # Format status with padding before applying color to avoid ANSI code width issues
+                status_padded = f'{build.status:<10}'
+                
                 self.stdout.write(
                     f'{build.id:<6} {build.repository.name:<25} {build.commit.sha[:8]:<10} '
-                    f'{build.branch_name[:18]:<20} {status_style(build.status):<10} {build.duration:<10}'
+                    f'{build.branch_name[:18]:<20} {status_style(status_padded)} {build.duration:<10}'
                 )

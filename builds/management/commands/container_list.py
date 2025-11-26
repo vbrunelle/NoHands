@@ -66,7 +66,10 @@ class Command(BaseCommand):
                 port_info = str(build.host_port) if build.host_port else '-'
                 url = build.container_url or '-'
                 
+                # Format status with padding before applying color to avoid ANSI code width issues
+                status_padded = f'{build.container_status:<12}'
+                
                 self.stdout.write(
                     f'{build.id:<8} {build.repository.name:<25} {build.commit.sha[:8]:<10} '
-                    f'{status_style(build.container_status):<12} {port_info:<10} {url}'
+                    f'{status_style(status_padded)} {port_info:<10} {url}'
                 )
