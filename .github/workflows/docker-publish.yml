@@ -67,6 +67,7 @@ jobs:
           # Check if token is configured
           if [ -z "${GH_TOKEN}" ]; then
             echo "⚠️ PACKAGE_VISIBILITY_TOKEN secret is not configured."
+            echo "The build succeeded, but the package visibility was NOT changed."
             echo "To enable automatic public visibility, add a PAT with write:packages scope as a repository secret named PACKAGE_VISIBILITY_TOKEN."
             echo "See README.md for detailed instructions."
             exit 0
@@ -81,7 +82,7 @@ jobs:
           # Set package visibility to public using GitHub API
           # This requires a PAT with write:packages scope
           # Try user endpoint first (for personal accounts)
-          HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" -X PATCH \
+          HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" --max-time 30 -X PATCH \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -93,7 +94,7 @@ jobs:
           elif [ "$HTTP_CODE" = "404" ]; then
             # Try organization endpoint if user endpoint returns 404
             echo "User endpoint returned 404, trying organization endpoint..."
-            HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" -X PATCH \
+            HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" --max-time 30 -X PATCH \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -104,15 +105,20 @@ jobs:
               echo "✅ Package visibility set to public successfully (organization)."
             else
               echo "❌ Failed to set package visibility. HTTP code: ${HTTP_CODE}"
-              cat /tmp/response.json
-              echo ""
+              # Extract only the message field from the response to avoid leaking sensitive data
+              jq -r '.message // "Unknown error"' /tmp/response.json 2>/dev/null || echo "Could not parse error response"
               echo "Note: For organization packages, visibility may need to be set manually in the GitHub UI."
             fi
           elif [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
             echo "❌ Authentication failed. HTTP code: ${HTTP_CODE}"
             echo "Please ensure PACKAGE_VISIBILITY_TOKEN has write:packages scope."
-            cat /tmp/response.json
+            # Extract only the message field from the response to avoid leaking sensitive data
+            jq -r '.message // "Unknown error"' /tmp/response.json 2>/dev/null || echo "Could not parse error response"
           else
             echo "❌ Failed to set package visibility. HTTP code: ${HTTP_CODE}"
-            cat /tmp/response.json
+            # Extract only the message field from the response to avoid leaking sensitive data
+            jq -r '.message // "Unknown error"' /tmp/response.json 2>/dev/null || echo "Could not parse error response"
           fi
+          
+          # Clean up temporary file
+          rm -f /tmp/response.json
