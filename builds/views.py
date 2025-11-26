@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.db.models import Case, When, Value, IntegerField
 from http.cookies import SimpleCookie
 from pathlib import Path
 import logging
@@ -53,8 +54,6 @@ def build_list(request):
     """List all builds."""
     # Sort builds: active (running, pending) first, then by repository name alphabetically
     # Using Case to put active statuses first (value 0), others second (value 1)
-    from django.db.models import Case, When, Value, IntegerField
-    
     builds = Build.objects.select_related('repository', 'commit').annotate(
         is_active=Case(
             When(status__in=['running', 'pending'], then=Value(0)),
@@ -73,8 +72,6 @@ def container_list(request):
     """List all builds with running or available containers."""
     # Get all builds that have containers (either running or with a successful build that can be started)
     # Sort: running containers first, then by repository name alphabetically
-    from django.db.models import Case, When, Value, IntegerField
-    
     builds_with_containers = Build.objects.select_related('repository', 'commit').filter(
         status='success'
     ).annotate(
