@@ -58,3 +58,22 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Make package public
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract package name (repository name without owner, lowercase)
+          PACKAGE_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          # Try to set package visibility to public
+          # This uses the GitHub API to change the package visibility
+          # Note: This requires the repository to be public for the package to be made public
+          curl -X PATCH \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/users/${OWNER}/packages/container/${PACKAGE_NAME}/visibility" \
+            -d '{"visibility":"public"}' \
+            --fail-with-body || echo "Note: Could not set package visibility. This may be expected for private repositories or if the package doesn't exist yet."
