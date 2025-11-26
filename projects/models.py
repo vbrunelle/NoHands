@@ -149,11 +149,20 @@ class AllowedHost(models.Model):
         return cls.objects.filter(hostname=hostname, is_active=True).exists()
 
     @classmethod
-    def add_host(cls, hostname):
-        """Add a hostname to the allowed list if it doesn't exist."""
+    def add_host(cls, hostname, is_active=True):
+        """
+        Add a hostname to the allowed list if it doesn't exist.
+        
+        Args:
+            hostname: The hostname or domain to add
+            is_active: Whether the host should be active (default: True)
+        
+        Returns:
+            tuple: (AllowedHost instance, created boolean)
+        """
         obj, created = cls.objects.get_or_create(
             hostname=hostname,
-            defaults={'is_active': True}
+            defaults={'is_active': is_active}
         )
         return obj, created
 

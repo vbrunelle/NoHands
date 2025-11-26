@@ -305,6 +305,38 @@ class DynamicAllowedHostsMiddlewareTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class HostMatchingTest(TestCase):
+    """Test cases for host matching logic in DynamicAllowedHostsMiddleware."""
+    
+    def test_subdomain_wildcard_matching(self):
+        """Test that subdomain wildcards match correctly."""
+        middleware = DynamicAllowedHostsMiddleware(lambda r: None)
+        
+        # .example.com should match sub.example.com and example.com
+        self.assertTrue(middleware._is_host_allowed('sub.example.com', ['.example.com']))
+        self.assertTrue(middleware._is_host_allowed('example.com', ['.example.com']))
+        self.assertTrue(middleware._is_host_allowed('deep.sub.example.com', ['.example.com']))
+        
+        # .example.com should NOT match badexample.com
+        self.assertFalse(middleware._is_host_allowed('badexample.com', ['.example.com']))
+        self.assertFalse(middleware._is_host_allowed('notexample.com', ['.example.com']))
+    
+    def test_exact_host_matching(self):
+        """Test that exact hosts match correctly."""
+        middleware = DynamicAllowedHostsMiddleware(lambda r: None)
+        
+        self.assertTrue(middleware._is_host_allowed('example.com', ['example.com']))
+        self.assertTrue(middleware._is_host_allowed('example.com:8000', ['example.com']))
+        self.assertFalse(middleware._is_host_allowed('other.com', ['example.com']))
+    
+    def test_wildcard_matching(self):
+        """Test that wildcard * matches everything."""
+        middleware = DynamicAllowedHostsMiddleware(lambda r: None)
+        
+        self.assertTrue(middleware._is_host_allowed('anything.com', ['*']))
+        self.assertTrue(middleware._is_host_allowed('localhost:8000', ['*']))
+
+
 class AllowedHostModelTest(TestCase):
     """Test cases for AllowedHost model."""
     

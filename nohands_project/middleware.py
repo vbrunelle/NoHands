@@ -115,10 +115,11 @@ class DynamicAllowedHostsMiddleware:
     
     def __init__(self, get_response):
         self.get_response = get_response
+        # Import here once instead of on every request
+        from projects.models import AllowedHost
+        self.AllowedHost = AllowedHost
     
     def __call__(self, request):
-        from projects.models import AllowedHost
-        
         # Get the host from the request (includes port if present)
         host = request.get_host()
         
@@ -132,7 +133,7 @@ class DynamicAllowedHostsMiddleware:
         
         # After setup, check if the host is in the allowed hosts list
         # First check database allowed hosts
-        db_hosts = AllowedHost.get_all_active_hosts()
+        db_hosts = self.AllowedHost.get_all_active_hosts()
         
         # Also check DJANGO_ALLOWED_HOSTS_FROM_ENV (from environment variable)
         env_hosts = getattr(settings, 'DJANGO_ALLOWED_HOSTS_FROM_ENV', [])
@@ -169,8 +170,10 @@ class DynamicAllowedHostsMiddleware:
                 # Wildcard matches everything
                 return True
             elif pattern.startswith('.'):
-                # Subdomain wildcard (e.g., '.example.com' matches 'sub.example.com')
-                if host_without_port == pattern[1:] or host_without_port.endswith(pattern):
+                # Subdomain wildcard (e.g., '.example.com' matches 'sub.example.com' and 'example.com')
+                # Must match either the exact domain or a proper subdomain
+                domain = pattern[1:]  # Remove leading dot
+                if host_without_port == domain or host_without_port.endswith('.' + domain):
                     return True
             else:
                 # Exact match (with or without port)
