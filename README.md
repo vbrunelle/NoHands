@@ -425,6 +425,8 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 
 The GitHub Actions workflow automatically sets the package visibility to **public** after pushing to the `main` branch. This allows anyone to pull the image without authentication.
 
+This feature works for both personal accounts (users) and organization accounts. The workflow automatically detects the account type and uses the appropriate API endpoint.
+
 To enable this feature, you need to configure a repository secret:
 
 1. **Generate a Personal Access Token (PAT)**:
@@ -440,7 +442,7 @@ To enable this feature, you need to configure a repository secret:
    - Value: Paste your PAT
    - Click **Add secret**
 
-> **Note**: The `GITHUB_TOKEN` cannot change package visibility, so a separate PAT with `write:packages` scope is required.
+> **Note**: The `GITHUB_TOKEN` cannot change package visibility, so a separate PAT with `write:packages` scope is required. If the secret is not configured, the workflow will skip this step and display instructions in the build logs.
 
 #### 🔐 Private Package Access (Human Actions Required)
 
