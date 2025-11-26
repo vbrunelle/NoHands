@@ -1,0 +1,28 @@
+services:
+  nohands:
+    image: ghcr.io/vbrunelle/nohands:main
+    ports:
+      - "8000:8000"
+    environment:
+      # Optional: Override the default Django secret key for production deployments
+      # The app has a built-in default key suitable for development/testing
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-True}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
+      - DOCKER_REGISTRY_USERNAME=${DOCKER_REGISTRY_USERNAME:-}
+      - DOCKER_REGISTRY_PASSWORD=${DOCKER_REGISTRY_PASSWORD:-}
+      - MAX_CONCURRENT_BUILDS=${MAX_CONCURRENT_BUILDS:-1}
+    volumes:
+      # Persist application data (database and git checkout cache)
+      - nohands_data:/app
+      # WARNING: Docker socket mounting provides root-level access to the host.
+      # This is required for Dagger to build Docker images.
+      # Only use in trusted environments.
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  nohands_data:
