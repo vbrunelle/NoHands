@@ -421,32 +421,9 @@ GITHUB_CLIENT_SECRET=your_github_client_secret
 
 > **⚠️ Security Note**: The Docker socket is mounted to allow Dagger to build Docker images. This provides root-level access to the host system. Only use in trusted environments.
 
-#### 🌐 Automatic Public Package Visibility
-
-The GitHub Actions workflow automatically sets the package visibility to **public** after pushing to the `main` branch. This allows anyone to pull the image without authentication.
-
-This feature works for both personal accounts (users) and organization accounts. The workflow automatically detects the account type and uses the appropriate API endpoint.
-
-To enable this feature, you need to configure a repository secret:
-
-1. **Generate a Personal Access Token (PAT)**:
-   - Go to https://github.com/settings/tokens
-   - Click "Generate new token (classic)"
-   - Select scope: `write:packages` (required for changing package visibility)
-   - Copy the generated token
-
-2. **Add the secret to your repository**:
-   - Go to your repository's **Settings** → **Secrets and variables** → **Actions**
-   - Click **New repository secret**
-   - Name: `PACKAGE_VISIBILITY_TOKEN`
-   - Value: Paste your PAT
-   - Click **Add secret**
-
-> **Note**: The `GITHUB_TOKEN` cannot change package visibility, so a separate PAT with `write:packages` scope is required. If the secret is not configured, the workflow will skip this step and display instructions in the build logs.
-
 #### 🔐 Private Package Access (Human Actions Required)
 
-If the automatic public visibility is not configured, or if you need to access private images:
+If the repository is private, the GHCR package will be private by default. To use private images:
 
 1. **Generate a Personal Access Token (PAT)**:
    - Go to https://github.com/settings/tokens
@@ -466,7 +443,7 @@ If the automatic public visibility is not configured, or if you need to access p
 
 #### Package Visibility Configuration (Repository Admin)
 
-To manually manage the package visibility:
+To manage the package visibility:
 
 1. Navigate to the repository's **Packages** section
 2. Click on the package (e.g., `nohands`)
@@ -475,7 +452,7 @@ To manually manage the package visibility:
    - **Private**: Only repository collaborators can access
    - **Public**: Anyone can pull the image
 
-> **Note**: The GitHub Actions workflow uses `GITHUB_TOKEN` which has automatic `packages:write` permission for pushing images. For changing visibility, a separate PAT secret (`PACKAGE_VISIBILITY_TOKEN`) is required.
+> **Note**: The GitHub Actions workflow uses `GITHUB_TOKEN` which has automatic `packages:write` permission. No additional secrets configuration is needed for the CI/CD pipeline.
 
 ## 🎯 Quick Start
 
