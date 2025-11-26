@@ -5,6 +5,7 @@ from django.shortcuts import redirect, render
 from django.contrib.auth.models import User
 from django.http import HttpResponseBadRequest
 from django.conf import settings
+from django.db.utils import DatabaseError, OperationalError
 from allauth.socialaccount.models import SocialApp
 import logging
 
@@ -37,7 +38,7 @@ class InitialSetupMiddleware:
         # Wrap in try/except to handle cases where database isn't ready
         try:
             has_users = User.objects.exists()
-        except Exception:
+        except (DatabaseError, OperationalError):
             # If database is not available, allow the request through
             # This ensures the server can start even if DB is not ready yet
             return self.get_response(request)
@@ -133,7 +134,7 @@ class DynamicAllowedHostsMiddleware:
         # Wrap in try/except to handle cases where database isn't ready
         try:
             has_users = User.objects.exists()
-        except Exception:
+        except (DatabaseError, OperationalError):
             # If database is not available (e.g., during startup), allow all hosts
             # This ensures the server can start even if DB is not ready yet
             return self.get_response(request)
@@ -147,7 +148,7 @@ class DynamicAllowedHostsMiddleware:
         # First check database allowed hosts
         try:
             db_hosts = self.AllowedHost.get_all_active_hosts()
-        except Exception:
+        except (DatabaseError, OperationalError):
             # If database is not available, use empty list
             db_hosts = []
         

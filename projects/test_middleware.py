@@ -519,15 +519,16 @@ class DatabaseUnavailableMiddlewareTest(TestCase):
         fall back to environment-based allowed hosts or allow all.
         """
         from unittest.mock import patch
+        from django.db.utils import OperationalError
         
         # Create a user so we pass the initial setup check
         User.objects.create_user(username='testuser', password='testpass')
         
         client = Client()
         
-        # Mock AllowedHost.get_all_active_hosts() to raise an exception
+        # Mock AllowedHost.get_all_active_hosts() to raise a database exception
         with patch('projects.models.AllowedHost.get_all_active_hosts') as mock_get_hosts:
-            mock_get_hosts.side_effect = Exception("Database unavailable")
+            mock_get_hosts.side_effect = OperationalError("Database unavailable")
             
             with self.settings(DJANGO_ALLOWED_HOSTS_FROM_ENV=['testserver']):
                 # Should use env hosts and allow the request
