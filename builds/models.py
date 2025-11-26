@@ -12,7 +12,7 @@ DOCKERFILE_TEMPLATES_DIR = Path(__file__).parent / 'dockerfile_templates'
 def get_dockerfile_templates():
     """
     Load all Dockerfile templates from the templates directory.
-    Returns a dictionary of {template_name: template_content}.
+    Returns a dictionary of {template_name: template_content}, sorted alphabetically by name.
     """
     templates = {}
     
@@ -26,7 +26,8 @@ def get_dockerfile_templates():
             except (IOError, OSError) as e:
                 logger.warning(f"Failed to read Dockerfile template '{template_name}': {e}")
     
-    return templates
+    # Return templates sorted alphabetically by name
+    return dict(sorted(templates.items()))
 
 
 def get_template_choices():
@@ -161,4 +162,62 @@ class Build(models.Model):
         if self.container_status == 'running' and self.host_port:
             return f"http://localhost:{self.host_port}"
         return ""
+
+    def sync_container_status(self) -> bool:
+        """
+        Synchronize container status with actual Docker state.
+        Returns True if status was updated, False otherwise.
+        """
+        import docker
+        
+        if not self.container_id:
+            # No container ID, nothing to sync
+            if self.container_status != 'none':
+                self.container_status = 'none'
+                self.save(update_fields=['container_status'])
+                logger.info(f"Build #{self.id}: Reset container status to 'none' (no container_id)")
+                return True
+            return False
+        
+        try:
+            client = docker.from_env()
+            try:
+                container = client.containers.get(self.container_id)
+                # Container exists, check its status
+                docker_status = container.status.lower()  # 'running', 'exited', 'paused', etc.
+                
+                # Map Docker status to our container_status
+                if docker_status == 'running':
+                    new_status = 'running'
+                elif docker_status in ['exited', 'dead']:
+                    new_status = 'stopped'
+                elif docker_status in ['created', 'restarting']:
+                    new_status = 'starting'
+                else:
+                    new_status = 'error'
+                
+                if self.container_status != new_status:
+                    old_status = self.container_status
+                    self.container_status = new_status
+                    self.save(update_fields=['container_status'])
+                    logger.info(f"Build #{self.id}: Container status updated from '{old_status}' to '{new_status}'")
+                    return True
+                    
+            except docker.errors.NotFound:
+                # Container no longer exists
+                if self.container_status != 'stopped':
+                    self.container_status = 'stopped'
+                    self.container_id = ''
+                    self.save(update_fields=['container_status', 'container_id'])
+                    logger.info(f"Build #{self.id}: Container no longer exists, status set to 'stopped'")
+                    return True
+                    
+        except Exception as e:
+            logger.error(f"Build #{self.id}: Error syncing container status: {e}")
+            if self.container_status != 'error':
+                self.container_status = 'error'
+                self.save(update_fields=['container_status'])
+                return True
+        
+        return False
 

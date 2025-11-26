@@ -91,6 +91,10 @@ def container_list(request):
 def build_detail(request, build_id):
     """View build details and logs."""
     build = get_object_or_404(Build, id=build_id)
+    
+    # Sync container status with actual Docker state
+    build.sync_container_status()
+    
     return render(request, 'builds/build_detail.html', {
         'build': build
     })
@@ -471,6 +475,9 @@ def proxy_to_container(request, build_id, path=''):
     these requests since the CSRF token comes from the container, not from Django.
     """
     build = get_object_or_404(Build, id=build_id)
+    
+    # Sync container status with actual Docker state
+    build.sync_container_status()
     
     # Check if container is running
     if build.container_status != 'running' or not build.host_port:
