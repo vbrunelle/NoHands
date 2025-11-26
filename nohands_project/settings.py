@@ -22,7 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 import os
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-p8q%n4$u1&g0f(g(f%np4w$)^+-uyd$-d5$nswng)n6@41_8*v')
+# Using 'or' ensures default is used when DJANGO_SECRET_KEY is set to empty string
+# (e.g., in Docker with DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-})
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or 'django-insecure-p8q%n4$u1&g0f(g(f%np4w$)^+-uyd$-d5$nswng)n6@41_8*v'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
@@ -185,10 +187,13 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-# Allauth settings
-ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+# Allauth settings (using modern settings to avoid deprecation warnings)
+# ACCOUNT_LOGIN_METHODS replaces deprecated ACCOUNT_AUTHENTICATION_METHOD
+ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
-ACCOUNT_EMAIL_REQUIRED = False
+# ACCOUNT_SIGNUP_FIELDS replaces deprecated ACCOUNT_EMAIL_REQUIRED
+# The asterisk (*) marks fields as required
+ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
 LOGIN_REDIRECT_URL = '/'
 LOGIN_URL = '/accounts/github/login/'
 LOGOUT_REDIRECT_URL = '/'
