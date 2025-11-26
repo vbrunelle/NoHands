@@ -276,7 +276,8 @@ def initial_setup(request):
 @login_required
 def repository_list(request):
     """List all Git repositories."""
-    repositories = GitRepository.objects.filter(is_active=True)
+    # Sort connected repositories alphabetically by name
+    repositories = GitRepository.objects.filter(is_active=True).order_by('name')
     
     # Try to fetch available GitHub repos if user has a token
     available_github_repos = []
@@ -315,6 +316,9 @@ def repository_list(request):
                         'default_branch': repo.default_branch,
                         'private': repo.private,
                     })
+            
+            # Sort available GitHub repos alphabetically by name
+            available_github_repos.sort(key=lambda x: x['name'].lower())
         except Exception as e:
             logger.error(f"Failed to fetch GitHub repositories: {e}")
             messages.warning(request, "Could not load available GitHub repositories.")

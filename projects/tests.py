@@ -620,3 +620,104 @@ class GetCurrentAppUrlTest(TestCase):
         
         url = get_current_app_url(request)
         self.assertEqual(url, 'http://localhost:9000')
+
+
+class RepositorySortingTest(TestCase):
+    """Tests for repository sorting in repository list view."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.login(username='testuser', password='testpass')
+        self.url = reverse('repository_list')
+    
+    def test_connected_repositories_sorted_alphabetically(self):
+        """Test that connected repositories are sorted alphabetically by name."""
+        # Create repos in non-alphabetical order
+        GitRepository.objects.create(name="zebra-repo", url="https://github.com/test/zebra.git", is_active=True)
+        GitRepository.objects.create(name="alpha-repo", url="https://github.com/test/alpha.git", is_active=True)
+        GitRepository.objects.create(name="beta-repo", url="https://github.com/test/beta.git", is_active=True)
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get repositories from context
+        repositories = list(response.context['repositories'])
+        
+        # Check they are sorted alphabetically
+        repo_names = [repo.name for repo in repositories]
+        self.assertEqual(repo_names, ['alpha-repo', 'beta-repo', 'zebra-repo'])
+    
+    @patch('projects.views.SocialToken.objects.get')
+    @patch('projects.views.Github')
+    def test_available_github_repos_sorted_alphabetically(self, mock_github, mock_social_token):
+        """Test that available GitHub repositories are sorted alphabetically."""
+        # Mock the social token
+        mock_token = MagicMock()
+        mock_token.token = 'fake_token'
+        mock_social_token.return_value = mock_token
+        
+        # Create mock repos in non-alphabetical order
+        mock_repo1 = MagicMock()
+        mock_repo1.id = 1
+        mock_repo1.name = "zebra-repo"
+        mock_repo1.full_name = "user/zebra-repo"
+        mock_repo1.description = "Zebra repo"
+        mock_repo1.clone_url = "https://github.com/user/zebra-repo.git"
+        mock_repo1.default_branch = "main"
+        mock_repo1.private = False
+        
+        mock_repo2 = MagicMock()
+        mock_repo2.id = 2
+        mock_repo2.name = "alpha-repo"
+        mock_repo2.full_name = "user/alpha-repo"
+        mock_repo2.description = "Alpha repo"
+        mock_repo2.clone_url = "https://github.com/user/alpha-repo.git"
+        mock_repo2.default_branch = "main"
+        mock_repo2.private = False
+        
+        mock_repo3 = MagicMock()
+        mock_repo3.id = 3
+        mock_repo3.name = "beta-repo"
+        mock_repo3.full_name = "user/beta-repo"
+        mock_repo3.description = "Beta repo"
+        mock_repo3.clone_url = "https://github.com/user/beta-repo.git"
+        mock_repo3.default_branch = "main"
+        mock_repo3.private = False
+        
+        mock_github_user = MagicMock()
+        mock_github_user.get_repos.return_value = [mock_repo1, mock_repo2, mock_repo3]
+        
+        mock_github_instance = MagicMock()
+        mock_github_instance.get_user.return_value = mock_github_user
+        mock_github.return_value = mock_github_instance
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get available repos from context
+        available_repos = response.context['available_github_repos']
+        
+        # Check they are sorted alphabetically by name
+        repo_names = [repo['name'] for repo in available_repos]
+        self.assertEqual(repo_names, ['alpha-repo', 'beta-repo', 'zebra-repo'])
+    
+    def test_connected_repos_displayed_before_available_repos(self):
+        """Test that connected repositories are displayed before available GitHub repos in the template."""
+        # Create a connected repository
+        GitRepository.objects.create(name="connected-repo", url="https://github.com/test/connected.git", is_active=True)
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get the HTML content
+        content = response.content.decode('utf-8')
+        
+        # Find positions of the section headers
+        connected_section_pos = content.find('Connected Repositories')
+        available_section_pos = content.find('Available GitHub Repositories')
+        
+        # Connected repositories section should come before available repos section (or available shouldn't exist if no token)
+        if available_section_pos != -1:  # If available section exists
+            self.assertLess(connected_section_pos, available_section_pos, 
+                "Connected Repositories section should appear before Available GitHub Repositories section")
