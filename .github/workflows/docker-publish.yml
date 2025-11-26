@@ -79,10 +79,16 @@ jobs:
           # Try to set package visibility to public
           # This uses the GitHub API to change the package visibility
           # Note: This requires the repository to be public for the package to be made public
-          curl -X PATCH \
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "$API_URL" \
-            -d '{"visibility":"public"}' \
-            --fail-with-body || echo "Note: Could not automatically set package visibility to public. You can manually change it at: https://github.com/${{ github.repository }}/pkgs/container/${PACKAGE_NAME}/settings"
+            -d '{"visibility":"public"}')
+          
+          if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
+            echo "Successfully set package visibility to public"
+          else
+            echo "Note: Could not automatically set package visibility to public (HTTP $HTTP_CODE)."
+            echo "You can manually change it at: https://github.com/${{ github.repository }}/pkgs/container/${PACKAGE_NAME}/settings"
+          fi
