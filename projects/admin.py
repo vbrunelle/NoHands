@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import GitRepository, Branch, Commit, AppConfiguration
+from .models import GitRepository, Branch, Commit, AppConfiguration, AllowedHost
 
 
 @admin.register(AppConfiguration)
@@ -37,3 +37,12 @@ class CommitAdmin(admin.ModelAdmin):
     list_display = ['sha', 'repository', 'branch', 'author', 'committed_at']
     list_filter = ['repository', 'committed_at']
     search_fields = ['sha', 'message', 'author']
+
+
+@admin.register(AllowedHost)
+class AllowedHostAdmin(admin.ModelAdmin):
+    list_display = ['hostname', 'is_active', 'created_at', 'updated_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['hostname']
+    readonly_fields = ['created_at', 'updated_at']
+    list_editable = ['is_active']

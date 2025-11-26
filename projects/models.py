@@ -108,3 +108,61 @@ class Commit(models.Model):
     def __str__(self) -> str:
         return f"{self.sha[:8]} - {self.message[:50]}"
 
+
+class AllowedHost(models.Model):
+    """
+    Stores allowed host domains for the application.
+    
+    These hosts are enforced after the initial server setup is complete.
+    During first start (no users exist), any host is allowed, and the first
+    host used during setup is automatically added to this list.
+    """
+    hostname = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Hostname or domain (e.g., 'localhost:8000', 'myapp.example.com')"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this host is currently allowed"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Allowed Host"
+        verbose_name_plural = "Allowed Hosts"
+        ordering = ['hostname']
+
+    def __str__(self) -> str:
+        status = "active" if self.is_active else "inactive"
+        return f"{self.hostname} ({status})"
+
+    @classmethod
+    def get_all_active_hosts(cls):
+        """Get all active allowed hosts as a list of hostnames."""
+        return list(cls.objects.filter(is_active=True).values_list('hostname', flat=True))
+
+    @classmethod
+    def is_host_allowed(cls, hostname):
+        """Check if a hostname is in the list of allowed hosts."""
+        return cls.objects.filter(hostname=hostname, is_active=True).exists()
+
+    @classmethod
+    def add_host(cls, hostname, is_active=True):
+        """
+        Add a hostname to the allowed list if it doesn't exist.
+        
+        Args:
+            hostname: The hostname or domain to add
+            is_active: Whether the host should be active (default: True)
+        
+        Returns:
+            tuple: (AllowedHost instance, created boolean)
+        """
+        obj, created = cls.objects.get_or_create(
+            hostname=hostname,
+            defaults={'is_active': is_active}
+        )
+        return obj, created
+
