@@ -68,12 +68,21 @@ jobs:
           PACKAGE_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           
+          # Determine if owner is a user or organization and set appropriate API endpoint
+          OWNER_TYPE="${{ github.repository_owner_type }}"
+          if [ "$OWNER_TYPE" = "Organization" ]; then
+            API_URL="https://api.github.com/orgs/${OWNER}/packages/container/${PACKAGE_NAME}/visibility"
+          else
+            API_URL="https://api.github.com/users/${OWNER}/packages/container/${PACKAGE_NAME}/visibility"
+          fi
+          
           # Try to set package visibility to public
           # This uses the GitHub API to change the package visibility
           # Note: This requires the repository to be public for the package to be made public
           curl -X PATCH \
             -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/users/${OWNER}/packages/container/${PACKAGE_NAME}/visibility" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$API_URL" \
             -d '{"visibility":"public"}' \
-            --fail-with-body || echo "Note: Could not set package visibility. This may be expected for private repositories or if the package doesn't exist yet."
+            --fail-with-body || echo "Note: Could not set package visibility. This may be expected if the package doesn't exist yet or if permissions are insufficient."
