@@ -28,6 +28,7 @@
 - [Usage Examples](#usage-examples)
   - [Web Interface Workflows](#web-interface-workflows)
   - [REST API Examples](#rest-api-examples)
+  - [CLI Commands](#cli-commands)
 - [Advanced Use Cases](#advanced-use-cases)
 - [Production Deployment](#production-deployment)
 - [Troubleshooting](#troubleshooting)
@@ -1209,6 +1210,274 @@ curl -X POST http://localhost:8000/api/builds/trigger/ \
 #### Get Build Details
 ```bash
 curl http://localhost:8000/api/builds/1/
+```
+
+### CLI Commands
+
+NoHands provides a comprehensive CLI suite using Django management commands that allows performing all tasks available in the UI. This is especially useful for automation, scripting, and agent-based workflows.
+
+#### Repository Commands
+
+##### `repo_list` - List All Repositories
+
+```bash
+# List all repositories
+python manage.py repo_list
+
+# List only active repositories
+python manage.py repo_list --active-only
+
+# Output in JSON format
+python manage.py repo_list --format=json
+```
+
+**Output Example:**
+```
+Found 2 repository(ies):
+
+ID     Name                           Default Branch  Active   URL
+----------------------------------------------------------------------------------------------------
+1      my-app                         main            ✓        https://github.com/user/my-app.git
+2      api-service                    develop         ✓        https://github.com/user/api.git
+```
+
+##### `repo_connect` - Connect a Repository
+
+```bash
+# Basic usage
+python manage.py repo_connect my-app https://github.com/user/my-app.git
+
+# With all options
+python manage.py repo_connect my-app https://github.com/user/my-app.git \
+    --description="My application" \
+    --default-branch=main \
+    --dockerfile-path=Dockerfile \
+    --user=admin
+```
+
+**Options:**
+- `--description`: Repository description
+- `--default-branch`: Default branch name (default: main)
+- `--dockerfile-path`: Path to Dockerfile in repo (default: Dockerfile)
+- `--inactive`: Create repository as inactive
+- `--github-id`: GitHub repository ID (optional)
+- `--user`: Username to associate with the repository
+
+##### `repo_refresh` - Refresh Repository Branches
+
+```bash
+# Refresh branches by repository ID
+python manage.py repo_refresh 1
+
+# Refresh branches by repository name
+python manage.py repo_refresh my-app
+
+# Output in JSON format
+python manage.py repo_refresh my-app --format=json
+```
+
+##### `branch_commits` - List Commits for a Branch
+
+```bash
+# List commits for default branch
+python manage.py branch_commits my-app
+
+# List commits for specific branch
+python manage.py branch_commits my-app --branch=develop
+
+# Refresh commits from Git before listing
+python manage.py branch_commits my-app --refresh
+
+# Limit number of commits
+python manage.py branch_commits my-app --limit=10
+
+# JSON output
+python manage.py branch_commits my-app --format=json
+```
+
+#### Build Commands
+
+##### `build_list` - List All Builds
+
+```bash
+# List all builds
+python manage.py build_list
+
+# Filter by repository
+python manage.py build_list --repository=my-app
+
+# Filter by status
+python manage.py build_list --status=success
+
+# Limit results
+python manage.py build_list --limit=10
+
+# JSON output
+python manage.py build_list --format=json
+```
+
+**Status options:** `pending`, `running`, `success`, `failed`, `cancelled`
+
+##### `build_create` - Create a New Build
+
+```bash
+# Build latest commit on default branch
+python manage.py build_create my-app
+
+# Build specific branch
+python manage.py build_create my-app --branch=develop
+
+# Build specific commit
+python manage.py build_create my-app --commit=abc123
+
+# Build and push to registry
+python manage.py build_create my-app --push-to-registry
+
+# Build with custom container port
+python manage.py build_create my-app --container-port=3000
+
+# Run build in background (don't wait)
+python manage.py build_create my-app --no-wait
+
+# Custom Dockerfile content
+python manage.py build_create my-app --dockerfile-content="FROM node:18\nCOPY . .\nCMD ['npm', 'start']"
+```
+
+**Options:**
+- `--branch`: Branch name (defaults to repository default branch)
+- `--commit`: Commit SHA (defaults to latest commit on branch)
+- `--push-to-registry`: Push the built image to the registry
+- `--container-port`: Container port to expose (default: 8080)
+- `--dockerfile-content`: Custom Dockerfile content (inline)
+- `--dockerfile-path`: Path to Dockerfile in repo
+- `--no-wait`: Do not wait for build to complete (run in background)
+- `--format`: Output format (table or json)
+
+##### `build_detail` - Get Build Details
+
+```bash
+# Get build details
+python manage.py build_detail 42
+
+# Include build logs
+python manage.py build_detail 42 --show-logs
+
+# JSON output
+python manage.py build_detail 42 --format=json
+```
+
+#### Container Commands
+
+##### `container_list` - List All Containers
+
+```bash
+# List all containers (successful builds)
+python manage.py container_list
+
+# List only running containers
+python manage.py container_list --running-only
+
+# JSON output
+python manage.py container_list --format=json
+```
+
+##### `container_start` - Start a Container
+
+```bash
+# Start container for a build
+python manage.py container_start 42
+
+# Start with specific host port
+python manage.py container_start 42 --host-port=8080
+
+# JSON output
+python manage.py container_start 42 --format=json
+```
+
+##### `container_stop` - Stop a Container
+
+```bash
+# Stop and remove container
+python manage.py container_stop 42
+
+# Stop but don't remove container
+python manage.py container_stop 42 --no-remove
+
+# JSON output
+python manage.py container_stop 42 --format=json
+```
+
+##### `container_logs` - Get Container Logs
+
+```bash
+# Get container logs
+python manage.py container_logs 42
+
+# Get last 50 lines
+python manage.py container_logs 42 --tail=50
+
+# JSON output
+python manage.py container_logs 42 --format=json
+```
+
+#### Complete CLI Workflow Example
+
+Here's a complete example showing how to use the CLI commands for a full build and deploy workflow:
+
+```bash
+#!/bin/bash
+# Complete CLI workflow example
+
+# 1. Connect a repository
+python manage.py repo_connect my-app https://github.com/user/my-app.git \
+    --description="My Application" \
+    --default-branch=main
+
+# 2. Refresh branches to fetch from Git
+python manage.py repo_refresh my-app
+
+# 3. List commits on the main branch
+python manage.py branch_commits my-app --branch=main --refresh
+
+# 4. Create a build (waits for completion by default)
+python manage.py build_create my-app --branch=main
+
+# 5. Check build status
+python manage.py build_detail 1
+
+# 6. Start a container for the successful build
+python manage.py container_start 1
+
+# 7. View container logs
+python manage.py container_logs 1 --tail=100
+
+# 8. List all running containers
+python manage.py container_list --running-only
+
+# 9. Stop the container when done
+python manage.py container_stop 1
+```
+
+#### JSON Output for Scripting
+
+All CLI commands support JSON output format, making them ideal for scripting and automation:
+
+```bash
+# Get repository list as JSON
+repos=$(python manage.py repo_list --format=json)
+
+# Parse with jq
+repo_id=$(echo "$repos" | jq -r '.[0].id')
+
+# Create build and get result as JSON
+result=$(python manage.py build_create "$repo_id" --format=json)
+build_id=$(echo "$result" | jq -r '.id')
+build_status=$(echo "$result" | jq -r '.status')
+
+if [ "$build_status" = "success" ]; then
+    echo "Build succeeded!"
+    python manage.py container_start "$build_id"
+fi
 ```
 
 ## 🚀 Advanced Use Cases
