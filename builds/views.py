@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.db.models import Case, When, Value, IntegerField
 from http.cookies import SimpleCookie
 from pathlib import Path
 import logging
@@ -51,7 +52,16 @@ def _validate_container_port(port_value, default=8080):
 @login_required
 def build_list(request):
     """List all builds."""
-    builds = Build.objects.select_related('repository', 'commit').all()
+    # Sort builds: active (running, pending) first, then by repository name alphabetically
+    # Using Case to put active statuses first (value 0), others second (value 1)
+    builds = Build.objects.select_related('repository', 'commit').annotate(
+        is_active=Case(
+            When(status__in=['running', 'pending'], then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
+    ).order_by('is_active', 'repository__name')
+    
     return render(request, 'builds/build_list.html', {
         'builds': builds
     })
@@ -61,9 +71,17 @@ def build_list(request):
 def container_list(request):
     """List all builds with running or available containers."""
     # Get all builds that have containers (either running or with a successful build that can be started)
+    # Sort: running containers first, then by repository name alphabetically
     builds_with_containers = Build.objects.select_related('repository', 'commit').filter(
         status='success'
-    ).order_by('-created_at')
+    ).annotate(
+        is_running=Case(
+            When(container_status='running', then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
+    ).order_by('is_running', 'repository__name')
+    
     return render(request, 'builds/container_list.html', {
         'builds': builds_with_containers
     })
@@ -73,6 +91,10 @@ def container_list(request):
 def build_detail(request, build_id):
     """View build details and logs."""
     build = get_object_or_404(Build, id=build_id)
+    
+    # Sync container status with actual Docker state
+    build.sync_container_status()
+    
     return render(request, 'builds/build_detail.html', {
         'build': build
     })
@@ -453,6 +475,9 @@ def proxy_to_container(request, build_id, path=''):
     these requests since the CSRF token comes from the container, not from Django.
     """
     build = get_object_or_404(Build, id=build_id)
+    
+    # Sync container status with actual Docker state
+    build.sync_container_status()
     
     # Check if container is running
     if build.container_status != 'running' or not build.host_port:

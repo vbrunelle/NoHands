@@ -1473,3 +1473,188 @@ class BuildDetailViewExtendedTest(TestCase):
         # Should show both container port and host port
         self.assertContains(response, "3000")
         self.assertContains(response, "49000")
+
+
+class BuildListSortingTest(TestCase):
+    """Tests for build list sorting - alphabetically by repository name with active builds first."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.login(username='testuser', password='testpass')
+        self.url = reverse('build_list')
+    
+    def test_builds_sorted_alphabetically_by_repository_name(self):
+        """Test that builds are sorted alphabetically by repository name."""
+        # Create repos in non-alphabetical order
+        repo_zebra = GitRepository.objects.create(name="zebra-repo", url="https://github.com/test/zebra.git")
+        repo_alpha = GitRepository.objects.create(name="alpha-repo", url="https://github.com/test/alpha.git")
+        repo_beta = GitRepository.objects.create(name="beta-repo", url="https://github.com/test/beta.git")
+        
+        # Create commits for each repo
+        commit_zebra = Commit.objects.create(
+            repository=repo_zebra, sha="abc123", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_alpha = Commit.objects.create(
+            repository=repo_alpha, sha="def456", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_beta = Commit.objects.create(
+            repository=repo_beta, sha="ghi789", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        
+        # Create builds in different order
+        Build.objects.create(repository=repo_zebra, commit=commit_zebra, branch_name="main", status="success")
+        Build.objects.create(repository=repo_alpha, commit=commit_alpha, branch_name="main", status="success")
+        Build.objects.create(repository=repo_beta, commit=commit_beta, branch_name="main", status="success")
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get builds from context
+        builds = list(response.context['builds'])
+        
+        # Check they are sorted alphabetically by repository name
+        repo_names = [build.repository.name for build in builds]
+        self.assertEqual(repo_names, ['alpha-repo', 'beta-repo', 'zebra-repo'])
+    
+    def test_active_builds_sorted_first(self):
+        """Test that active (running/pending) builds appear before completed builds, then alphabetically."""
+        # Create repos in different order
+        repo_alpha = GitRepository.objects.create(name="alpha-repo", url="https://github.com/test/alpha.git")
+        repo_beta = GitRepository.objects.create(name="beta-repo", url="https://github.com/test/beta.git")
+        repo_gamma = GitRepository.objects.create(name="gamma-repo", url="https://github.com/test/gamma.git")
+        
+        # Create commits
+        commit_alpha = Commit.objects.create(
+            repository=repo_alpha, sha="abc123", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_beta = Commit.objects.create(
+            repository=repo_beta, sha="def456", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_gamma = Commit.objects.create(
+            repository=repo_gamma, sha="ghi789", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        
+        # Create builds: alpha=success, beta=running, gamma=pending
+        Build.objects.create(repository=repo_alpha, commit=commit_alpha, branch_name="main", status="success")
+        Build.objects.create(repository=repo_beta, commit=commit_beta, branch_name="main", status="running")
+        Build.objects.create(repository=repo_gamma, commit=commit_gamma, branch_name="main", status="pending")
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get builds from context
+        builds = list(response.context['builds'])
+        
+        # Active builds (pending, running) should come first, sorted alphabetically,
+        # then completed builds, sorted alphabetically
+        expected_order = ['beta-repo', 'gamma-repo', 'alpha-repo']
+        repo_names = [build.repository.name for build in builds]
+        self.assertEqual(repo_names, expected_order)
+
+
+class ContainerListSortingTest(TestCase):
+    """Tests for container list sorting - running containers first, then alphabetically by repository name."""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.login(username='testuser', password='testpass')
+        self.url = reverse('container_list')
+    
+    def test_containers_sorted_alphabetically_by_repository_name(self):
+        """Test that containers are sorted alphabetically by repository name."""
+        # Create repos in non-alphabetical order
+        repo_zebra = GitRepository.objects.create(name="zebra-repo", url="https://github.com/test/zebra.git")
+        repo_alpha = GitRepository.objects.create(name="alpha-repo", url="https://github.com/test/alpha.git")
+        repo_beta = GitRepository.objects.create(name="beta-repo", url="https://github.com/test/beta.git")
+        
+        # Create commits
+        commit_zebra = Commit.objects.create(
+            repository=repo_zebra, sha="abc123", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_alpha = Commit.objects.create(
+            repository=repo_alpha, sha="def456", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_beta = Commit.objects.create(
+            repository=repo_beta, sha="ghi789", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        
+        # Create successful builds (containers)
+        Build.objects.create(
+            repository=repo_zebra, commit=commit_zebra, branch_name="main",
+            status="success", container_status="stopped"
+        )
+        Build.objects.create(
+            repository=repo_alpha, commit=commit_alpha, branch_name="main",
+            status="success", container_status="stopped"
+        )
+        Build.objects.create(
+            repository=repo_beta, commit=commit_beta, branch_name="main",
+            status="success", container_status="stopped"
+        )
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get builds from context
+        builds = list(response.context['builds'])
+        
+        # Check they are sorted alphabetically by repository name
+        repo_names = [build.repository.name for build in builds]
+        self.assertEqual(repo_names, ['alpha-repo', 'beta-repo', 'zebra-repo'])
+    
+    def test_running_containers_sorted_first(self):
+        """Test that running containers appear before stopped containers, then alphabetically."""
+        # Create repos
+        repo_alpha = GitRepository.objects.create(name="alpha-repo", url="https://github.com/test/alpha.git")
+        repo_beta = GitRepository.objects.create(name="beta-repo", url="https://github.com/test/beta.git")
+        repo_gamma = GitRepository.objects.create(name="gamma-repo", url="https://github.com/test/gamma.git")
+        
+        # Create commits
+        commit_alpha = Commit.objects.create(
+            repository=repo_alpha, sha="abc123", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_beta = Commit.objects.create(
+            repository=repo_beta, sha="def456", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        commit_gamma = Commit.objects.create(
+            repository=repo_gamma, sha="ghi789", message="Test",
+            author="Test", author_email="test@example.com", committed_at=timezone.now()
+        )
+        
+        # Create builds: alpha=stopped, beta=running, gamma=running
+        Build.objects.create(
+            repository=repo_alpha, commit=commit_alpha, branch_name="main",
+            status="success", container_status="stopped"
+        )
+        Build.objects.create(
+            repository=repo_beta, commit=commit_beta, branch_name="main",
+            status="success", container_status="running", host_port=8080, container_id="abc123"
+        )
+        Build.objects.create(
+            repository=repo_gamma, commit=commit_gamma, branch_name="main",
+            status="success", container_status="running", host_port=8081, container_id="def456"
+        )
+        
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        
+        # Get builds from context
+        builds = list(response.context['builds'])
+        
+        # Running containers should come first (alphabetically), then stopped (alphabetically)
+        expected_order = ['beta-repo', 'gamma-repo', 'alpha-repo']
+        repo_names = [build.repository.name for build in builds]
+        self.assertEqual(repo_names, expected_order)
