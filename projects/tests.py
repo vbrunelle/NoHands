@@ -393,6 +393,127 @@ class GitUtilsTest(TestCase):
             get_file_content(Path("/tmp/test-repo"), "abc123", "nonexistent.txt")
         
         self.assertIn("not found", str(context.exception))
+    
+    @patch('projects.git_utils.Repo')
+    def test_list_commits_local_branch(self, mock_repo_class):
+        """Test listing commits from a local branch."""
+        from projects.git_utils import list_commits
+        from datetime import datetime
+        
+        # Create mock commits
+        mock_commit1 = MagicMock()
+        mock_commit1.hexsha = "abc123"
+        mock_commit1.message = "First commit"
+        mock_commit1.author.name = "Alice"
+        mock_commit1.author.email = "alice@example.com"
+        mock_commit1.committed_date = 1234567890
+        
+        mock_commit2 = MagicMock()
+        mock_commit2.hexsha = "def456"
+        mock_commit2.message = "Second commit"
+        mock_commit2.author.name = "Bob"
+        mock_commit2.author.email = "bob@example.com"
+        mock_commit2.committed_date = 1234567900
+        
+        # Create mock branch reference
+        mock_branch = MagicMock()
+        
+        # Configure mock repo
+        mock_repo = MagicMock()
+        mock_repo.heads = {'main': mock_branch}
+        mock_repo.iter_commits.return_value = [mock_commit1, mock_commit2]
+        mock_repo_class.return_value = mock_repo
+        
+        commits = list_commits(Path("/tmp/test-repo"), "main", max_count=10)
+        
+        self.assertEqual(len(commits), 2)
+        self.assertEqual(commits[0]['sha'], 'abc123')
+        self.assertEqual(commits[0]['message'], 'First commit')
+        self.assertEqual(commits[0]['author'], 'Alice')
+        self.assertEqual(commits[1]['sha'], 'def456')
+    
+    @patch('projects.git_utils.Repo')
+    def test_list_commits_remote_branch(self, mock_repo_class):
+        """Test listing commits from a remote branch (origin/branch-name)."""
+        from projects.git_utils import list_commits
+        
+        # Create mock commits
+        mock_commit1 = MagicMock()
+        mock_commit1.hexsha = "remote123"
+        mock_commit1.message = "Remote commit"
+        mock_commit1.author.name = "Charlie"
+        mock_commit1.author.email = "charlie@example.com"
+        mock_commit1.committed_date = 1234567890
+        
+        # Create mock remote reference
+        mock_remote_ref = MagicMock()
+        
+        # Configure mock repo
+        # Empty heads (no local branches)
+        mock_repo = MagicMock()
+        mock_repo.heads = {}
+        # Mock the commit() method to return a valid reference for remote branches
+        mock_repo.commit.return_value = mock_remote_ref
+        mock_repo.iter_commits.return_value = [mock_commit1]
+        mock_repo_class.return_value = mock_repo
+        
+        commits = list_commits(Path("/tmp/test-repo"), "origin/feature-branch", max_count=10)
+        
+        self.assertEqual(len(commits), 1)
+        self.assertEqual(commits[0]['sha'], 'remote123')
+        self.assertEqual(commits[0]['message'], 'Remote commit')
+        self.assertEqual(commits[0]['author'], 'Charlie')
+        # Verify that we tried to find the remote branch with remotes/ prefix
+        mock_repo.commit.assert_called_with('remotes/origin/feature-branch')
+    
+    @patch('projects.git_utils.Repo')
+    def test_list_commits_branch_not_found(self, mock_repo_class):
+        """Test listing commits from a non-existent branch."""
+        from projects.git_utils import list_commits, GitUtilsError
+        
+        # Configure mock repo with no branches
+        mock_repo = MagicMock()
+        mock_repo.heads = {}
+        mock_repo.commit.side_effect = Exception("Reference not found")
+        mock_repo_class.return_value = mock_repo
+        
+        with self.assertRaises(GitUtilsError) as context:
+            list_commits(Path("/tmp/test-repo"), "nonexistent-branch")
+        
+        self.assertIn("not found", str(context.exception))
+    
+    @patch('projects.git_utils.Repo')
+    def test_list_commits_with_max_count(self, mock_repo_class):
+        """Test listing commits with max_count limit."""
+        from projects.git_utils import list_commits
+        
+        # Create 10 mock commits
+        mock_commits = []
+        for i in range(10):
+            mock_commit = MagicMock()
+            mock_commit.hexsha = f"sha{i}"
+            mock_commit.message = f"Commit {i}"
+            mock_commit.author.name = "Author"
+            mock_commit.author.email = "author@example.com"
+            mock_commit.committed_date = 1234567890 + i
+            mock_commits.append(mock_commit)
+        
+        # Create mock branch reference
+        mock_branch = MagicMock()
+        
+        # Configure mock repo
+        mock_repo = MagicMock()
+        mock_repo.heads = {'main': mock_branch}
+        mock_repo.iter_commits.return_value = mock_commits[:5]  # Only return 5
+        mock_repo_class.return_value = mock_repo
+        
+        commits = list_commits(Path("/tmp/test-repo"), "main", max_count=5)
+        
+        self.assertEqual(len(commits), 5)
+        # Verify max_count was passed to iter_commits
+        mock_repo.iter_commits.assert_called_once()
+        call_args = mock_repo.iter_commits.call_args
+        self.assertEqual(call_args[1]['max_count'], 5)
 
 
 class ConnectGitHubRepositoryViewTest(TestCase):
