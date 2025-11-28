@@ -100,10 +100,27 @@ def list_commits(repo_path: Path, branch: str, max_count: int = 50) -> List[Dict
         repo = Repo(repo_path)
         
         # Get the branch reference
-        if branch not in repo.heads:
-            raise GitUtilsError(f"Branch '{branch}' not found")
+        # Try local branches first, then remote branches
+        branch_ref = None
         
-        branch_ref = repo.heads[branch]
+        # Check local branches
+        if branch in repo.heads:
+            branch_ref = repo.heads[branch]
+        # Check remote branches (e.g., "origin/main" or "origin/feature-branch")
+        elif branch.startswith('origin/'):
+            remote_branch = f"remotes/{branch}"
+            try:
+                branch_ref = repo.commit(remote_branch)
+            except Exception:
+                pass
+        
+        # If still not found, try treating it as a reference
+        if not branch_ref:
+            try:
+                branch_ref = repo.commit(branch)
+            except Exception:
+                raise GitUtilsError(f"Branch '{branch}' not found")
+        
         commits = []
         
         for commit in repo.iter_commits(branch_ref, max_count=max_count):
