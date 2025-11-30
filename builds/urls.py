@@ -16,4 +16,6 @@ urlpatterns = [
     path('api/file-content/<int:repo_id>/<int:commit_id>/', views.get_commit_file_content, name='get_commit_file_content'),
     # API endpoint for Dockerfile templates
     path('api/templates/<str:template_name>/', views.get_dockerfile_template, name='get_dockerfile_template'),
+    # API endpoint for .env templates
+    path('api/env-templates/<str:template_name>/', views.get_env_template, name='get_env_template'),
 ]
