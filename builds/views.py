@@ -14,7 +14,7 @@ import os
 import requests
 import re
 
-from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE, get_dockerfile_templates, get_default_template
+from .models import Build, DEFAULT_DOCKERFILE_TEMPLATE, get_dockerfile_templates, get_default_template, get_env_templates, get_default_env_template
 from projects.models import GitRepository, Commit
 from projects.git_utils import (
     checkout_commit, clone_or_update_repo, GitUtilsError,
@@ -115,6 +115,9 @@ def build_create(request, repo_id, commit_id):
         dockerfile_content = request.POST.get('dockerfile_content', DEFAULT_DOCKERFILE_TEMPLATE)
         dockerfile_path = request.POST.get('dockerfile_path', 'Dockerfile')
         
+        # Environment configuration
+        env_content = request.POST.get('env_content', '')
+        
         # Validate dockerfile_source
         if dockerfile_source not in ['generated', 'custom', 'repo_file']:
             dockerfile_source = 'generated'
@@ -129,7 +132,8 @@ def build_create(request, repo_id, commit_id):
             container_port=container_port,
             dockerfile_source=dockerfile_source,
             dockerfile_content=dockerfile_content,
-            dockerfile_path=dockerfile_path
+            dockerfile_path=dockerfile_path,
+            env_content=env_content
         )
         
         # Start build in background thread
@@ -141,15 +145,19 @@ def build_create(request, repo_id, commit_id):
         messages.success(request, f"Build #{build.id} started")
         return redirect('build_detail', build_id=build.id)
     
-    # Get Dockerfile templates
+    # Get Dockerfile templates and .env templates
     templates = get_dockerfile_templates()
     default_template = get_default_template()
+    env_templates = get_env_templates()
+    default_env_template = get_default_env_template()
     
     return render(request, 'builds/build_create.html', {
         'repository': repository,
         'commit': commit,
         'default_dockerfile': default_template,
-        'dockerfile_templates': templates
+        'dockerfile_templates': templates,
+        'env_templates': env_templates,
+        'default_env': default_env_template
     })
 
 
@@ -385,6 +393,27 @@ def get_dockerfile_template(request, template_name):
         })
 
 
+@login_required
+def get_env_template(request, template_name):
+    """
+    Get a specific .env template by name (JSON API).
+    """
+    templates = get_env_templates()
+    
+    if template_name in templates:
+        return JsonResponse({
+            'success': True,
+            'name': template_name,
+            'content': templates[template_name]
+        })
+    else:
+        return JsonResponse({
+            'success': False,
+            'error': f".env template '{template_name}' not found",
+            'content': ''
+        })
+
+
 def execute_build(build_id: int):
     """
     Execute a build in the background.
@@ -420,6 +449,13 @@ def execute_build(build_id: int):
             # Use specified file from repo as Dockerfile
             dockerfile_path = build.dockerfile_path
             logger.info(f"Using repository file '{dockerfile_path}' as Dockerfile for build #{build.id}")
+        
+        # Write .env file if env_content is provided
+        if build.env_content:
+            env_file_path = checkout_path / '.env'
+            with open(env_file_path, 'w') as f:
+                f.write(build.env_content)
+            logger.info(f"Wrote .env file for build #{build.id}")
         
         # Generate image tag
         image_name = build.repository.name.lower().replace(' ', '-')

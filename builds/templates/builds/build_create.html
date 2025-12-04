@@ -150,6 +150,21 @@
                     
                     <hr class="my-4">
                     
+                    <!-- Environment Variables Section -->
+                    <div class="mb-3" id="env-content-section">
+                        <label class="form-label" for="env_content">
+                            <strong><i class="ti ti-file-text me-1"></i>Environment Variables (.env)</strong>
+                        </label>
+                        <textarea class="form-control" id="env_content" name="env_content" 
+                                  rows="8" style="font-family: monospace; font-size: 0.875rem;">{{ default_env }}</textarea>
+                        <small class="form-hint">
+                            Define environment variables for this build. These will be written to a .env file in the build context.
+                            The .env content is specific to this build and does not affect the template.
+                        </small>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
                     <!-- Container Port -->
                     <div class="mb-3">
                         <label class="form-label" for="container_port">
@@ -318,6 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const templateSelectionSection = document.getElementById('template-selection-section');
     const templateSelect = document.getElementById('dockerfile_template');
     const dockerfileContentTextarea = document.getElementById('dockerfile_content');
+    const envContentTextarea = document.getElementById('env_content');
     const browseFilesBtn = document.getElementById('browse-files-btn');
     const fileBrowserModal = new bootstrap.Modal(document.getElementById('file-browser-modal'));
     const fileListEl = document.getElementById('file-list');
@@ -348,13 +364,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Handle template selection change
+    // Handle template selection change - load both Dockerfile and .env templates
     templateSelect.addEventListener('change', function() {
         const templateName = this.value;
-        loadTemplate(templateName);
+        loadDockerfileTemplate(templateName);
+        loadEnvTemplate(templateName);
     });
     
-    function loadTemplate(templateName) {
+    function loadDockerfileTemplate(templateName) {
         fetch(`/builds/api/templates/${encodeURIComponent(templateName)}/`)
             .then(response => response.json())
             .then(data => {
@@ -363,7 +380,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                console.error('Error loading template:', error);
+                console.error('Error loading Dockerfile template:', error);
+            });
+    }
+    
+    function loadEnvTemplate(templateName) {
+        fetch(`/builds/api/env-templates/${encodeURIComponent(templateName)}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    envContentTextarea.value = data.content;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading .env template:', error);
             });
     }
     

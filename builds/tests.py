@@ -925,6 +925,178 @@ class DockerfileTemplatesTest(TestCase):
         self.assertIn('npm', nodejs_template.lower())
 
 
+class EnvTemplatesTest(TestCase):
+    """Tests for .env templates functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+    
+    def test_get_env_templates(self):
+        """Test that .env templates are loaded from the templates directory."""
+        from builds.models import get_env_templates
+        
+        templates = get_env_templates()
+        
+        # Should have several templates
+        self.assertGreater(len(templates), 0)
+        
+        # Check for expected templates
+        self.assertIn('Python', templates)
+        self.assertIn('Django', templates)
+        self.assertIn('Flask', templates)
+        self.assertIn('FastAPI', templates)
+        self.assertIn('Node.js', templates)
+        self.assertIn('React', templates)
+        self.assertIn('Go', templates)
+    
+    def test_get_default_env_template(self):
+        """Test that default .env template is Python."""
+        from builds.models import get_default_env_template
+        
+        default = get_default_env_template()
+        
+        # Should contain some content
+        self.assertGreater(len(default.strip()), 0)
+    
+    def test_env_template_api_url_resolves(self):
+        """Test .env template API URL resolves correctly."""
+        url = reverse('get_env_template', args=['Python'])
+        self.assertEqual(url, '/builds/api/env-templates/Python/')
+    
+    def test_env_template_api_returns_content(self):
+        """Test .env template API returns template content."""
+        url = reverse('get_env_template', args=['Django'])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['name'], 'Django')
+        self.assertIn('DJANGO_ALLOWED_HOSTS', data['content'])
+    
+    def test_env_template_api_invalid_template(self):
+        """Test .env template API returns error for invalid template."""
+        url = reverse('get_env_template', args=['InvalidTemplate'])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('not found', data['error'])
+    
+    def test_django_env_template_has_allowed_hosts(self):
+        """Test Django .env template has DJANGO_ALLOWED_HOSTS."""
+        from builds.models import get_env_templates
+        
+        templates = get_env_templates()
+        django_env = templates.get('Django', '')
+        
+        # Should have DJANGO_ALLOWED_HOSTS for the issue requirement
+        self.assertIn('DJANGO_ALLOWED_HOSTS', django_env)
+    
+    def test_flask_env_template_content(self):
+        """Test Flask .env template has correct content."""
+        from builds.models import get_env_templates
+        
+        templates = get_env_templates()
+        flask_env = templates.get('Flask', '')
+        
+        self.assertIn('FLASK_APP', flask_env)
+        self.assertIn('FLASK_ENV', flask_env)
+    
+    def test_nodejs_env_template_content(self):
+        """Test Node.js .env template has correct content."""
+        from builds.models import get_env_templates
+        
+        templates = get_env_templates()
+        nodejs_env = templates.get('Node.js', '')
+        
+        self.assertIn('NODE_ENV', nodejs_env)
+
+
+class BuildEnvContentTest(TestCase):
+    """Tests for Build model env_content field."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.branch = Branch.objects.create(
+            repository=self.repo,
+            name="main",
+            commit_sha="abc123"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            branch=self.branch,
+            sha="abc123def456",
+            message="Test commit",
+            author="Test Author",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_build_env_content_field_default(self):
+        """Test that env_content field has correct default."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="pending"
+        )
+        self.assertEqual(build.env_content, '')
+    
+    def test_build_with_custom_env_content(self):
+        """Test creating a build with custom env_content."""
+        env_content = "DEBUG=True\nDATABASE_URL=postgres://localhost/db"
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="pending",
+            env_content=env_content
+        )
+        self.assertEqual(build.env_content, env_content)
+    
+    @patch('builds.views.threading.Thread')
+    def test_create_build_with_env_content(self, mock_thread):
+        """Test creating a build with env_content via POST."""
+        url = reverse('build_create', args=[self.repo.id, self.commit.id])
+        
+        env_content = "DEBUG=False\nSECRET_KEY=test-key"
+        response = self.client.post(url, {
+            'dockerfile_source': 'generated',
+            'dockerfile_content': 'FROM python:3.11\nCOPY . .',
+            'env_content': env_content,
+            'container_port': '8080'
+        })
+        
+        # Should redirect to build detail
+        self.assertEqual(response.status_code, 302)
+        
+        # Build should be created with env_content
+        build = Build.objects.get(repository=self.repo, commit=self.commit)
+        self.assertEqual(build.env_content, env_content)
+
+
 class PortMappingTest(TestCase):
     """Tests for container port mapping functionality."""
     

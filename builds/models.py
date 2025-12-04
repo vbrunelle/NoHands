@@ -30,6 +30,41 @@ def get_dockerfile_templates():
     return dict(sorted(templates.items()))
 
 
+def get_env_templates():
+    """
+    Load all .env templates from the templates directory.
+    Returns a dictionary of {template_name: template_content}, sorted alphabetically by name.
+    """
+    templates = {}
+    
+    if DOCKERFILE_TEMPLATES_DIR.exists():
+        for file_path in DOCKERFILE_TEMPLATES_DIR.glob('*.env'):
+            # Use filename without extension as template name
+            template_name = file_path.stem
+            try:
+                with open(file_path, 'r') as f:
+                    templates[template_name] = f.read()
+            except (IOError, OSError) as e:
+                logger.warning(f"Failed to read .env template '{template_name}': {e}")
+    
+    # Return templates sorted alphabetically by name
+    return dict(sorted(templates.items()))
+
+
+def get_default_env_template():
+    """Get the default .env template (Python)."""
+    templates = get_env_templates()
+    return templates.get('Python', DEFAULT_ENV_TEMPLATE)
+
+
+# Default .env template (fallback)
+DEFAULT_ENV_TEMPLATE = """# Environment Variables
+# Add your environment variables here
+
+DEBUG=True
+"""
+
+
 def get_template_choices():
     """
     Get template choices for use in forms/models.
@@ -117,6 +152,13 @@ class Build(models.Model):
         blank=True,
         default='Dockerfile',
         help_text="Path to Dockerfile in repository"
+    )
+    
+    # Environment configuration
+    env_content = models.TextField(
+        blank=True,
+        default='',
+        help_text="Environment variables content (.env file)"
     )
     
     # Logs and output
