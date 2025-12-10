@@ -9,6 +9,7 @@ urlpatterns = [
     path('<int:build_id>/start-container/', views.start_build_container, name='start_build_container'),
     path('<int:build_id>/stop-container/', views.stop_build_container, name='stop_build_container'),
     path('<int:build_id>/container-logs/', views.container_logs, name='container_logs'),
+    path('<int:build_id>/execute-command/', views.execute_container_command, name='execute_container_command'),
     # Proxy to container
     re_path(r'^(?P<build_id>\d+)/fwd/(?P<path>.*)$', views.proxy_to_container, name='proxy_to_container'),
     # API endpoints for file selection

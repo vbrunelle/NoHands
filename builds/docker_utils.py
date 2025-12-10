@@ -325,3 +325,48 @@ def load_image_from_tar(tar_path: str) -> str:
         raise DockerError("Timeout while loading image")
     except FileNotFoundError:
         raise DockerError("Docker command not found. Is Docker installed?")
+
+
+def exec_command_in_container(container_id: str, command: str, workdir: str = '/app') -> Tuple[str, int]:
+    """
+    Execute a command in a running Docker container.
+    
+    Args:
+        container_id: Docker container ID
+        command: Command to execute
+        workdir: Working directory for the command (default: /app)
+        
+    Returns:
+        Tuple of (output, exit_code)
+        
+    Raises:
+        DockerError: If command execution fails
+    """
+    try:
+        # Use docker exec to run command
+        cmd = [
+            'docker', 'exec',
+            '-w', workdir,
+            container_id,
+            'sh', '-c', command
+        ]
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutes timeout
+        )
+        
+        # Combine stdout and stderr for full output
+        output = result.stdout
+        if result.stderr:
+            output += '\n' + result.stderr
+        
+        logger.info(f"Executed command in container {container_id[:12]}: {command}")
+        return output.strip(), result.returncode
+        
+    except subprocess.TimeoutExpired:
+        raise DockerError("Command execution timed out (5 minutes)")
+    except FileNotFoundError:
+        raise DockerError("Docker command not found. Is Docker installed?")

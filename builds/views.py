@@ -23,7 +23,8 @@ from projects.git_utils import (
 from .dagger_pipeline import run_build_sync
 from .docker_utils import (
     start_container, stop_container, remove_container,
-    get_container_logs, get_container_status, load_image_from_tar, DockerError
+    get_container_logs, get_container_status, load_image_from_tar, 
+    exec_command_in_container, DockerError
 )
 
 logger = logging.getLogger(__name__)
@@ -300,6 +301,58 @@ def container_logs(request, build_id):
             'success': False,
             'error': str(e),
             'logs': ''
+        })
+
+
+@login_required
+def execute_container_command(request, build_id):
+    """
+    Execute a command in a running container (JSON API).
+    POST with 'command' parameter.
+    """
+    build = get_object_or_404(Build, id=build_id)
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'POST method required'
+        }, status=405)
+    
+    if not build.container_id:
+        return JsonResponse({
+            'success': False,
+            'error': 'No container running'
+        })
+    
+    if build.container_status != 'running':
+        return JsonResponse({
+            'success': False,
+            'error': f'Container is not running (status: {build.container_status})'
+        })
+    
+    command = request.POST.get('command', '')
+    if not command:
+        return JsonResponse({
+            'success': False,
+            'error': 'Command parameter is required'
+        })
+    
+    try:
+        output, exit_code = exec_command_in_container(build.container_id, command)
+        
+        return JsonResponse({
+            'success': True,
+            'output': output,
+            'exit_code': exit_code,
+            'command': command,
+            'container_id': build.container_id[:12]
+        })
+        
+    except DockerError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'output': ''
         })
 
 
