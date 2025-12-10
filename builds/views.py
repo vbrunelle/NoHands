@@ -23,7 +23,8 @@ from projects.git_utils import (
 from .dagger_pipeline import run_build_sync
 from .docker_utils import (
     start_container, stop_container, remove_container,
-    get_container_logs, get_container_status, load_image_from_tar, DockerError
+    get_container_logs, get_container_status, load_image_from_tar,
+    exec_command_in_container, DockerError
 )
 
 logger = logging.getLogger(__name__)
@@ -300,6 +301,71 @@ def container_logs(request, build_id):
             'success': False,
             'error': str(e),
             'logs': ''
+        })
+
+
+@login_required
+def execute_container_command(request, build_id):
+    """
+    Execute a command in a running container (JSON API).
+    POST with 'command' parameter.
+    Only allows execution of pre-defined commands for the build's template.
+    """
+    build = get_object_or_404(Build, id=build_id)
+    
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'POST method required'
+        }, status=405)
+    
+    if not build.container_id:
+        return JsonResponse({
+            'success': False,
+            'error': 'No container running'
+        })
+    
+    if build.container_status != 'running':
+        return JsonResponse({
+            'success': False,
+            'error': f'Container is not running (status: {build.container_status})'
+        })
+    
+    command = request.POST.get('command', '')
+    if not command:
+        return JsonResponse({
+            'success': False,
+            'error': 'Command parameter is required'
+        })
+    
+    # Security: Validate that the command is in the allowed list for this template
+    available_commands = build.available_commands
+    allowed_commands = [cmd['command'] for cmd in available_commands]
+    
+    if command not in allowed_commands:
+        logger.warning(f"Attempt to execute unauthorized command: {command} for build #{build_id}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Command not allowed for this template'
+        })
+    
+    try:
+        # Execute with a reasonable timeout (reduced from 300s to 120s)
+        output, exit_code = exec_command_in_container(build.container_id, command, timeout=120)
+        
+        return JsonResponse({
+            'success': True,
+            'output': output,
+            'exit_code': exit_code,
+            'command': command,
+            'container_id': build.container_id[:12]
+        })
+        
+    except DockerError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'output': ''
         })
 
 

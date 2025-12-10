@@ -28,7 +28,7 @@
                             <th>Build</th>
                             <th>Repository</th>
                             <th>Branch</th>
-                            <th>Image</th>
+                            <th>Template</th>
                             <th>Status</th>
                             <th>Port</th>
                             <th>Created</th>
@@ -54,7 +54,9 @@
                                 </span>
                             </td>
                             <td>
-                                <code class="small">{{ build.image_tag|default:"N/A" }}</code>
+                                <span class="badge bg-purple-lt">
+                                    {{ build.detected_template }}
+                                </span>
                             </td>
                             <td>
                                 {% if build.container_status == 'running' %}

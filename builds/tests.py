@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import subprocess
 
 from .models import Build
 from projects.models import GitRepository, Branch, Commit
@@ -1830,3 +1831,135 @@ class ContainerListSortingTest(TestCase):
         expected_order = ['beta-repo', 'gamma-repo', 'alpha-repo']
         repo_names = [build.repository.name for build in builds]
         self.assertEqual(repo_names, expected_order)
+
+
+class TemplateCommandsTest(TestCase):
+    """Tests for template-specific commands functionality."""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create and login a test user
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass'
+        )
+        self.client.login(username='testuser', password='testpass')
+        
+        # Create test data
+        self.repo = GitRepository.objects.create(
+            name="test-repo",
+            url="https://github.com/test/repo.git"
+        )
+        self.commit = Commit.objects.create(
+            repository=self.repo,
+            sha="abc123",
+            message="Test",
+            author="Test",
+            author_email="test@example.com",
+            committed_at=timezone.now()
+        )
+    
+    def test_detect_django_template(self):
+        """Test detecting Django template from Dockerfile."""
+        from builds.models import detect_template_from_dockerfile
+        
+        dockerfile = "FROM python:3.11\nRUN pip install django\nCMD python manage.py runserver"
+        template = detect_template_from_dockerfile(dockerfile)
+        self.assertEqual(template, 'Django')
+    
+    def test_detect_flask_template(self):
+        """Test detecting Flask template from Dockerfile."""
+        from builds.models import detect_template_from_dockerfile
+        
+        dockerfile = "FROM python:3.11\nRUN pip install flask\nCMD flask run"
+        template = detect_template_from_dockerfile(dockerfile)
+        self.assertEqual(template, 'Flask')
+    
+    def test_get_template_commands_django(self):
+        """Test getting commands for Django template."""
+        from builds.models import get_template_commands
+        
+        commands = get_template_commands('Django')
+        
+        self.assertGreater(len(commands), 0)
+        
+        # Check for specific Django commands
+        command_names = [cmd['name'] for cmd in commands]
+        self.assertIn('Run Tests', command_names)
+        self.assertIn('Run Migrations', command_names)
+    
+    def test_build_detected_template_property(self):
+        """Test Build.detected_template property."""
+        django_dockerfile = "FROM python:3.11\nRUN pip install django\nCMD python manage.py runserver"
+        
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            dockerfile_content=django_dockerfile
+        )
+        
+        self.assertEqual(build.detected_template, 'Django')
+    
+    def test_execute_command_requires_post(self):
+        """Test that execute command requires POST method."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_id="abc123",
+            container_status="running"
+        )
+        
+        url = reverse('execute_container_command', args=[build.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 405)  # Method not allowed
+    
+    @patch('builds.views.exec_command_in_container')
+    def test_execute_command_success(self, mock_exec):
+        """Test successful command execution."""
+        mock_exec.return_value = ("Command output\nLine 2", 0)
+        
+        django_dockerfile = "FROM python:3.11\nRUN pip install django\nCMD python manage.py runserver"
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_id="abc123",
+            container_status="running",
+            dockerfile_content=django_dockerfile
+        )
+        
+        url = reverse('execute_container_command', args=[build.id])
+        # Use a valid Django command from the template
+        response = self.client.post(url, {'command': 'python manage.py test'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['exit_code'], 0)
+
+    def test_execute_unauthorized_command_rejected(self):
+        """Test that unauthorized commands are rejected."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_id="abc123",
+            container_status="running",
+            dockerfile_content="FROM python:3.11\nRUN pip install django"
+        )
+        
+        url = reverse('execute_container_command', args=[build.id])
+        # Try to execute a command not in the allowed list
+        response = self.client.post(url, {'command': 'rm -rf /'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('not allowed', data['error'])

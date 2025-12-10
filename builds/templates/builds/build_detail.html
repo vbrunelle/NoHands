@@ -278,6 +278,61 @@
         </div>
     </div>
     
+    {% if build.container_status == 'running' and build.available_commands %}
+    <!-- Template Commands Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-terminal-2 me-2"></i>
+                    Quick Commands
+                </h3>
+                <div class="card-actions">
+                    <span class="badge bg-blue-lt">
+                        {{ build.detected_template }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Execute common commands for this {{ build.detected_template }} container:</p>
+                <div class="row g-2">
+                    {% for cmd in build.available_commands %}
+                    <div class="col-md-6 col-lg-4">
+                        <button 
+                            class="btn btn-outline-primary w-100 execute-command-btn" 
+                            data-command="{{ cmd.command }}"
+                            data-name="{{ cmd.name }}"
+                            title="{{ cmd.description }}">
+                            <i class="{{ cmd.icon }} me-1"></i>
+                            {{ cmd.name }}
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Command output section -->
+                <div id="command-output-section" class="mt-3" style="display: none;">
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="mb-0">Command Output</h4>
+                        <button class="btn btn-sm btn-ghost-secondary" id="clear-output-btn">
+                            <i class="ti ti-x"></i>
+                            Clear
+                        </button>
+                    </div>
+                    <div id="command-info" class="alert alert-info mb-2" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            <span id="command-info-text">Executing command...</span>
+                        </div>
+                    </div>
+                    <pre id="command-output" class="logs" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; margin: 0;">No output yet...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
     {% if build.container_status == 'running' %}
     <!-- Container Logs Card - Auto-refresh without toggle -->
     <div class="col-12">
@@ -409,6 +464,133 @@
     // Start auto-refresh immediately - 2 second interval for near real-time updates
     fetchLogs();
     setInterval(fetchLogs, 2000);
+    
+    // Handle command execution
+    const commandButtons = document.querySelectorAll('.execute-command-btn');
+    const commandOutputSection = document.getElementById('command-output-section');
+    const commandOutput = document.getElementById('command-output');
+    const commandInfo = document.getElementById('command-info');
+    const commandInfoText = document.getElementById('command-info-text');
+    const clearOutputBtn = document.getElementById('clear-output-btn');
+    
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    
+    // Execute command
+    function executeCommand(command, commandName) {
+        // Show output section
+        commandOutputSection.style.display = 'block';
+        
+        // Show loading state
+        commandInfo.style.display = 'block';
+        commandInfoText.textContent = `Executing: ${commandName}...`;
+        commandOutput.textContent = 'Waiting for output...';
+        
+        // Disable all command buttons
+        commandButtons.forEach(btn => {
+            btn.disabled = true;
+            btn.classList.add('disabled');
+        });
+        
+        // Execute command
+        const formData = new FormData();
+        formData.append('command', command);
+        
+        fetch('{% url "execute_container_command" build.id %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Hide loading state
+            commandInfo.style.display = 'none';
+            
+            if (data.success) {
+                const exitCodeBadge = data.exit_code === 0 
+                    ? '<span class="badge bg-success">Exit: 0</span>' 
+                    : `<span class="badge bg-danger">Exit: ${data.exit_code}</span>`;
+                
+                // Create elements safely to avoid XSS
+                commandOutput.innerHTML = '';
+                
+                // Create command info div
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'mb-2';
+                infoDiv.innerHTML = `<strong>Command:</strong> <code>${data.command}</code> ${exitCodeBadge}`;
+                commandOutput.appendChild(infoDiv);
+                
+                // Create output div with safe text content
+                const outputDiv = document.createElement('div');
+                outputDiv.textContent = data.output || '(No output)';
+                commandOutput.appendChild(outputDiv);
+            } else {
+                // Create error message safely
+                commandOutput.innerHTML = '';
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'text-danger';
+                errorDiv.innerHTML = '<strong>Error:</strong> ';
+                const errorText = document.createTextNode(data.error);
+                errorDiv.appendChild(errorText);
+                commandOutput.appendChild(errorDiv);
+            }
+            
+            // Auto-scroll to command output
+            commandOutputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Re-enable command buttons
+            commandButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+            });
+        })
+        .catch(error => {
+            commandInfo.style.display = 'none';
+            commandOutput.innerHTML = `<div class="text-danger">
+                <strong>Error:</strong> ${error.message}
+            </div>`;
+            
+            // Re-enable command buttons
+            commandButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+            });
+        });
+    }
+    
+    // Attach click handlers to command buttons
+    commandButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const command = this.getAttribute('data-command');
+            const commandName = this.getAttribute('data-name');
+            executeCommand(command, commandName);
+        });
+    });
+    
+    // Clear output button
+    if (clearOutputBtn) {
+        clearOutputBtn.addEventListener('click', function() {
+            commandOutputSection.style.display = 'none';
+            commandOutput.textContent = 'No output yet...';
+        });
+    }
 </script>
 {% endif %}
 {% endblock %}

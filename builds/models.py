@@ -101,6 +101,189 @@ CMD ["python", "-m", "http.server", "8080"]
 """
 
 
+# Template-specific commands configuration
+TEMPLATE_COMMANDS = {
+    'Django': [
+        {
+            'name': 'Run Tests',
+            'command': 'python manage.py test',
+            'description': 'Run Django test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Run Migrations',
+            'command': 'python manage.py migrate --noinput',
+            'description': 'Apply database migrations',
+            'icon': 'ti-database'
+        },
+        {
+            'name': 'Show Migrations',
+            'command': 'python manage.py showmigrations',
+            'description': 'Show migration status',
+            'icon': 'ti-list'
+        },
+        {
+            'name': 'Collect Static',
+            'command': 'python manage.py collectstatic --noinput',
+            'description': 'Collect static files',
+            'icon': 'ti-folder'
+        },
+        {
+            'name': 'Check Deployment',
+            'command': 'python manage.py check --deploy',
+            'description': 'Check deployment configuration',
+            'icon': 'ti-checklist'
+        },
+    ],
+    'Flask': [
+        {
+            'name': 'Run Tests',
+            'command': 'python -m pytest -v',
+            'description': 'Run Flask test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Check Dependencies',
+            'command': 'pip list',
+            'description': 'List installed packages',
+            'icon': 'ti-package'
+        },
+    ],
+    'FastAPI': [
+        {
+            'name': 'Run Tests',
+            'command': 'pytest -v',
+            'description': 'Run FastAPI test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Check Dependencies',
+            'command': 'pip list',
+            'description': 'List installed packages',
+            'icon': 'ti-package'
+        },
+    ],
+    'React': [
+        {
+            'name': 'Run Tests',
+            'command': 'npm test -- --watchAll=false',
+            'description': 'Run React test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Build Production',
+            'command': 'npm run build',
+            'description': 'Build for production',
+            'icon': 'ti-package'
+        },
+        {
+            'name': 'List Dependencies',
+            'command': 'npm list --depth=0',
+            'description': 'List installed packages',
+            'icon': 'ti-list'
+        },
+    ],
+    'Node.js': [
+        {
+            'name': 'Run Tests',
+            'command': 'npm test',
+            'description': 'Run Node.js test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Run Lint',
+            'command': 'npm run lint || echo "No lint script found"',
+            'description': 'Run linter',
+            'icon': 'ti-checklist'
+        },
+        {
+            'name': 'Check Version',
+            'command': 'node --version && npm --version',
+            'description': 'Show Node and npm versions',
+            'icon': 'ti-info-circle'
+        },
+    ],
+    'Python': [
+        {
+            'name': 'Run Tests',
+            'command': 'python -m pytest -v',
+            'description': 'Run Python test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Check Dependencies',
+            'command': 'pip list',
+            'description': 'List installed packages',
+            'icon': 'ti-package'
+        },
+        {
+            'name': 'Python Version',
+            'command': 'python --version',
+            'description': 'Show Python version',
+            'icon': 'ti-info-circle'
+        },
+    ],
+    'Go': [
+        {
+            'name': 'Run Tests',
+            'command': 'go test ./... -v',
+            'description': 'Run Go test suite',
+            'icon': 'ti-test-pipe'
+        },
+        {
+            'name': 'Go Version',
+            'command': 'go version',
+            'description': 'Show Go version',
+            'icon': 'ti-info-circle'
+        },
+        {
+            'name': 'List Modules',
+            'command': 'go list -m all',
+            'description': 'List Go modules',
+            'icon': 'ti-list'
+        },
+    ],
+    'Static HTML': [],  # No commands for static sites
+}
+
+
+def detect_template_from_dockerfile(dockerfile_content: str) -> str:
+    """
+    Detect the template type from Dockerfile content.
+    Returns the template name or 'Python' as fallback.
+    """
+    content_lower = dockerfile_content.lower()
+    
+    # Check for specific markers in the Dockerfile
+    if 'django' in content_lower or 'manage.py' in content_lower:
+        return 'Django'
+    elif 'flask' in content_lower:
+        return 'Flask'
+    elif 'fastapi' in content_lower or 'uvicorn' in content_lower:
+        return 'FastAPI'
+    elif 'from node:' in content_lower and 'react' in content_lower:
+        return 'React'
+    elif 'from node:' in content_lower:
+        return 'Node.js'
+    elif 'from golang:' in content_lower or 'from go:' in content_lower:
+        return 'Go'
+    elif 'from nginx' in content_lower and 'html' in content_lower:
+        return 'Static HTML'
+    elif 'from python:' in content_lower:
+        return 'Python'
+    
+    # Default fallback
+    return 'Python'
+
+
+def get_template_commands(template_name: str) -> list:
+    """
+    Get available commands for a specific template.
+    Returns a list of command dictionaries.
+    """
+    return TEMPLATE_COMMANDS.get(template_name, [])
+
+
 class Build(models.Model):
     """
     Represents a build request and its execution status.
@@ -204,6 +387,25 @@ class Build(models.Model):
         if self.container_status == 'running' and self.host_port:
             return f"http://localhost:{self.host_port}"
         return ""
+
+    @property
+    def detected_template(self) -> str:
+        """
+        Detect and return the template type from the Dockerfile content.
+        Returns the template name (e.g., 'Django', 'Flask', 'React', etc.)
+        """
+        if self.dockerfile_content:
+            return detect_template_from_dockerfile(self.dockerfile_content)
+        return 'Python'
+
+    @property
+    def available_commands(self) -> list:
+        """
+        Get available commands for this build based on its detected template.
+        Returns a list of command dictionaries.
+        """
+        template = self.detected_template
+        return get_template_commands(template)
 
     def sync_container_status(self) -> bool:
         """
