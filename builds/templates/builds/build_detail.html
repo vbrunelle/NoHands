@@ -508,13 +508,15 @@
         });
         
         // Execute command
+        const formData = new FormData();
+        formData.append('command', command);
+        
         fetch('{% url "execute_container_command" build.id %}', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
                 'X-CSRFToken': csrftoken
             },
-            body: `command=${encodeURIComponent(command)}`
+            body: formData
         })
         .then(response => response.json())
         .then(data => {
@@ -525,15 +527,29 @@
                 const exitCodeBadge = data.exit_code === 0 
                     ? '<span class="badge bg-success">Exit: 0</span>' 
                     : `<span class="badge bg-danger">Exit: ${data.exit_code}</span>`;
-                    
-                commandOutput.innerHTML = `<div class="mb-2">
-                    <strong>Command:</strong> <code>${data.command}</code> ${exitCodeBadge}
-                </div>
-<div>${data.output || '(No output)'}</div>`;
+                
+                // Create elements safely to avoid XSS
+                commandOutput.innerHTML = '';
+                
+                // Create command info div
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'mb-2';
+                infoDiv.innerHTML = `<strong>Command:</strong> <code>${data.command}</code> ${exitCodeBadge}`;
+                commandOutput.appendChild(infoDiv);
+                
+                // Create output div with safe text content
+                const outputDiv = document.createElement('div');
+                outputDiv.textContent = data.output || '(No output)';
+                commandOutput.appendChild(outputDiv);
             } else {
-                commandOutput.innerHTML = `<div class="text-danger">
-                    <strong>Error:</strong> ${data.error}
-                </div>`;
+                // Create error message safely
+                commandOutput.innerHTML = '';
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'text-danger';
+                errorDiv.innerHTML = '<strong>Error:</strong> ';
+                const errorText = document.createTextNode(data.error);
+                errorDiv.appendChild(errorText);
+                commandOutput.appendChild(errorDiv);
             }
             
             // Auto-scroll to command output
