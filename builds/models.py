@@ -117,10 +117,10 @@ TEMPLATE_COMMANDS = {
             'icon': 'ti-database'
         },
         {
-            'name': 'Create Superuser',
-            'command': 'python manage.py createsuperuser --noinput --username admin --email admin@example.com || echo "Superuser already exists"',
-            'description': 'Create admin user (username: admin)',
-            'icon': 'ti-user-plus'
+            'name': 'Show Migrations',
+            'command': 'python manage.py showmigrations',
+            'description': 'Show migration status',
+            'icon': 'ti-list'
         },
         {
             'name': 'Collect Static',

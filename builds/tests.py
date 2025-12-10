@@ -1924,19 +1924,42 @@ class TemplateCommandsTest(TestCase):
         """Test successful command execution."""
         mock_exec.return_value = ("Command output\nLine 2", 0)
         
+        django_dockerfile = "FROM python:3.11\nRUN pip install django\nCMD python manage.py runserver"
         build = Build.objects.create(
             repository=self.repo,
             commit=self.commit,
             branch_name="main",
             status="success",
             container_id="abc123",
-            container_status="running"
+            container_status="running",
+            dockerfile_content=django_dockerfile
         )
         
         url = reverse('execute_container_command', args=[build.id])
-        response = self.client.post(url, {'command': 'echo test'})
-        
+        # Use a valid Django command from the template
+        response = self.client.post(url, {'command': 'python manage.py test'})
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['success'])
         self.assertEqual(data['exit_code'], 0)
+
+    def test_execute_unauthorized_command_rejected(self):
+        """Test that unauthorized commands are rejected."""
+        build = Build.objects.create(
+            repository=self.repo,
+            commit=self.commit,
+            branch_name="main",
+            status="success",
+            container_id="abc123",
+            container_status="running",
+            dockerfile_content="FROM python:3.11\nRUN pip install django"
+        )
+        
+        url = reverse('execute_container_command', args=[build.id])
+        # Try to execute a command not in the allowed list
+        response = self.client.post(url, {'command': 'rm -rf /'})
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('not allowed', data['error'])

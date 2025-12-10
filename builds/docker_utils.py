@@ -327,20 +327,25 @@ def load_image_from_tar(tar_path: str) -> str:
         raise DockerError("Docker command not found. Is Docker installed?")
 
 
-def exec_command_in_container(container_id: str, command: str, workdir: str = '/app') -> Tuple[str, int]:
+def exec_command_in_container(container_id: str, command: str, workdir: str = '/app', timeout: int = 120) -> Tuple[str, int]:
     """
     Execute a command in a running Docker container.
     
     Args:
         container_id: Docker container ID
-        command: Command to execute
+        command: Command to execute (should be pre-validated against allowed commands)
         workdir: Working directory for the command (default: /app)
+        timeout: Command timeout in seconds (default: 120)
         
     Returns:
         Tuple of (output, exit_code)
         
     Raises:
         DockerError: If command execution fails
+        
+    Security Note:
+        This function does not validate the command. The caller MUST validate
+        that the command is from an allowed whitelist before calling this function.
     """
     try:
         # Use docker exec to run command
@@ -355,7 +360,7 @@ def exec_command_in_container(container_id: str, command: str, workdir: str = '/
             cmd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minutes timeout
+            timeout=timeout
         )
         
         # Combine stdout and stderr for full output
@@ -367,6 +372,6 @@ def exec_command_in_container(container_id: str, command: str, workdir: str = '/
         return output.strip(), result.returncode
         
     except subprocess.TimeoutExpired:
-        raise DockerError("Command execution timed out (5 minutes)")
+        raise DockerError(f"Command execution timed out ({timeout} seconds)")
     except FileNotFoundError:
         raise DockerError("Docker command not found. Is Docker installed?")

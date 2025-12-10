@@ -23,7 +23,7 @@ from projects.git_utils import (
 from .dagger_pipeline import run_build_sync
 from .docker_utils import (
     start_container, stop_container, remove_container,
-    get_container_logs, get_container_status, load_image_from_tar, 
+    get_container_logs, get_container_status, load_image_from_tar,
     exec_command_in_container, DockerError
 )
 
@@ -309,6 +309,7 @@ def execute_container_command(request, build_id):
     """
     Execute a command in a running container (JSON API).
     POST with 'command' parameter.
+    Only allows execution of pre-defined commands for the build's template.
     """
     build = get_object_or_404(Build, id=build_id)
     
@@ -337,8 +338,20 @@ def execute_container_command(request, build_id):
             'error': 'Command parameter is required'
         })
     
+    # Security: Validate that the command is in the allowed list for this template
+    available_commands = build.available_commands
+    allowed_commands = [cmd['command'] for cmd in available_commands]
+    
+    if command not in allowed_commands:
+        logger.warning(f"Attempt to execute unauthorized command: {command} for build #{build_id}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Command not allowed for this template'
+        })
+    
     try:
-        output, exit_code = exec_command_in_container(build.container_id, command)
+        # Execute with a reasonable timeout (reduced from 300s to 120s)
+        output, exit_code = exec_command_in_container(build.container_id, command, timeout=120)
         
         return JsonResponse({
             'success': True,
